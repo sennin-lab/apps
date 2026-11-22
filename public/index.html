@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホーム</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-color: #f2f2f7; --text-color: #1c1c1e; --text-secondary: #8e8e93;
+      --glass-bg: rgba(255,255,255,0.65); --glass-border: rgba(255,255,255,0.8);
+      --glass-shadow: 0 10px 30px rgba(0,0,0,0.05), inset 0 0 0.5px 1px rgba(255,255,255,0.9);
+      --glass-hover-bg: rgba(255,255,255,0.85);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-color); color: var(--text-color); margin: 0; padding: 40px 20px;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+    h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 24px; letter-spacing: -0.5px; }
+    .search-container { width: 100%; max-width: 400px; margin-bottom: 40px; }
+    .search-input { width: 100%; padding: 12px 20px; font-size: 0.95rem; background: var(--glass-bg);
+      border: 1px solid var(--glass-border); border-radius: 20px; color: var(--text-color); outline: none;
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--glass-shadow);
+      box-sizing: border-box; transition: all 0.3s ease; }
+    .search-input::placeholder { color: var(--text-secondary); }
+    .search-input:focus { background: var(--glass-hover-bg); }
+    .app-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px 16px; width: 100%; max-width: 420px; }
+    .app-item { text-decoration: none; color: var(--text-color); display: flex; flex-direction: column;
+      align-items: center; cursor: pointer; transition: transform 0.2s cubic-bezier(0.25,1,0.5,1); }
+    .app-item:active { transform: scale(0.92); }
+    .app-icon { width: 68px; height: 68px; background: var(--glass-bg); border-radius: 18px; display: flex;
+      align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 600; overflow: hidden;
+      backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow); margin-bottom: 8px; transition: all 0.25s ease; }
+    .app-item:hover .app-icon { background: var(--glass-hover-bg); transform: translateY(-2px); }
+    .app-name { font-size: 0.75rem; font-weight: 500; text-align: center; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; width: 100%; }
+    .empty { color: var(--text-secondary); font-size: 14px; text-align: center; }
+    .store-link { margin-top: 40px; font-size: 13px; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+  <h1>ホーム</h1>
+  <div class="search-container">
+    <input type="text" id="searchInput" class="search-input" placeholder="Appを検索" oninput="filterApps()">
+  </div>
+  <div class="app-grid" id="appGrid"></div>
+  <a class="store-link" href="/store.html">ストアを開く →</a>
+
+  <script type="module">
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const cfg = await (await fetch('/api/config')).json();
+    const sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) await sb.auth.signInAnonymously();
+
+    const { data: rows } = await sb.from('library')
+      .select('items(id,title,launch_url,open_mode,icon_url)')
+      .order('acquired_at');
+    const apps = (rows || []).map(r => r.items).filter(i => i && i.launch_url);
+
+    const grid = document.getElementById('appGrid');
+    if (!apps.length) {
+      grid.innerHTML = '<p class="empty" style="grid-column:1/-1">ストアでアプリを入手すると、ここに表示されます</p>';
+    } else {
+      grid.innerHTML = apps.map(i => `
+        <div class="app-item" data-id="${esc(i.id)}" role="button">
+          <div class="app-icon">
+            ${i.icon_url
+              ? `<img src="${esc(i.icon_url)}" alt="" style="width:100%;height:100%;object-fit:cover">`
+              : esc(i.title.charAt(0))}
+          </div>
+          <div class="app-name">${esc(i.title)}</div>
+        </div>`).join('');
+    }
+
+    grid.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-id]');
+      if (!el) return;
+      const item = apps.find(x => x.id === el.dataset.id);
+      if (item.open_mode === 'new_tab') window.open(item.launch_url, '_blank');
+      else location.href = `/run.html?url=${encodeURIComponent(item.launch_url)}&title=${encodeURIComponent(item.title)}`;
+    });
+
+    window.filterApps = () => {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      grid.querySelectorAll('.app-item').forEach(el => {
+        el.style.display = el.querySelector('.app-name').textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+      });
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>起動中</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  #app { border: 0; width: 100%; height: calc(100% - 64px); display: block; background: #fff; }
+  .bar { height: 64px; display: flex; align-items: center; justify-content: space-between;
+         padding: 0 16px; background: #111; color: #fff; font-family: -apple-system, sans-serif; }
+  .home { color: #fff; background: #333; border-radius: 999px; padding: 10px 20px;
+          text-decoration: none; font-size: 15px; }
+  .fallback { color: #fff; font-size: 13px; }
+  #title { font-size: 14px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+</style>
+</head>
+<body>
+<iframe id="app" allow="fullscreen; clipboard-write"></iframe>
+<div class="bar">
+  <a class="home" href="/">🏠 ホーム</a>
+  <span id="title"></span>
+  <a class="fallback" id="fallback" target="_blank" rel="noopener">別タブ</a>
+</div>
+<script>
+  const p = new URLSearchParams(location.search);
+  const url = p.get('url');
+  const title = p.get('title') || '';
+  if (url && /^https?:\/\//.test(url)) {
+    document.getElementById('app').src = url;
+    document.getElementById('fallback').href = url;
+  }
+  document.getElementById('title').textContent = title;
+  document.title = title;
+</script>
+</body>
+</html>

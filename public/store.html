@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>store</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Helvetica Neue"', '"Hiragino Kaku Gothic ProN"', '"Hiragino Sans"', 'Meiryo', 'sans-serif'],
+          },
+          colors: {
+            appleBg: '#F5F5F7', appleCard: '#FFFFFF', appleBlue: '#007AFF', appleBlueHover: '#0066D6',
+            applePill: '#F2F2F7', appleText: '#1D1D1F', appleSecondary: '#86868B',
+          },
+          boxShadow: {
+            'apple-card': '0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.03)',
+            'apple-card-hover': '0 20px 40px -8px rgba(0, 0, 0, 0.09), 0 8px 18px -4px rgba(0, 0, 0, 0.05)',
+            'apple-drawer-left': '12px 0 40px rgba(0, 0, 0, 0.12)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .squircle { border-radius: 22.5%; }
+    @keyframes handlePulse {
+      0%, 100% { transform: translateY(-50%) scaleY(1); opacity: 0.55; }
+      50% { transform: translateY(-50%) scaleY(1.06); opacity: 0.85; }
+    }
+    .handle-idle { animation: handlePulse 3.5s ease-in-out infinite; }
+    .handle-idle:hover, .handle-active { animation: none; opacity: 1 !important; }
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
+    .animate-spin-fast { animation: spinSlow 0.7s linear infinite; }
+    .drawer-transition { transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1); }
+    .backdrop-transition { transition: opacity 0.35s ease; }
+    @keyframes spaFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .spa-view-enter { animation: spaFadeIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  </style>
+</head>
+<body class="bg-appleBg text-appleText font-sans antialiased selection:bg-appleBlue/20 overflow-x-hidden">
+
+  <!-- ストア一覧 -->
+  <div id="store-view" class="min-h-screen pb-24">
+    <header class="max-w-6xl mx-auto px-6 sm:px-10 pt-8 sm:pt-12 pb-4 flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <button id="reset-home-btn" class="text-left focus:outline-none group max-w-full" title="storeトップに戻る">
+          <h1 id="main-header-title" class="text-[36px] sm:text-[46px] font-extralight tracking-tight leading-tight text-appleText group-hover:opacity-75 transition-opacity truncate">store</h1>
+        </button>
+      </div>
+      <div id="filter-badge-container" class="hidden flex-shrink-0">
+        <button id="clear-filter-btn" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-xs font-medium text-appleText shadow-sm border border-black/5 hover:bg-gray-50 active:scale-95 transition">
+          <span id="filter-badge-text">すべてに戻る</span>
+          <svg class="w-3.5 h-3.5 text-appleSecondary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 sm:px-10 space-y-10 sm:space-y-12 mt-2">
+      <section id="trending-section">
+        <div class="flex items-baseline justify-between mb-4">
+          <h2 class="text-xl sm:text-2xl font-semibold tracking-tight text-appleText">今トレンド</h2>
+        </div>
+        <div id="trending-container" class="flex gap-5 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6 sm:mx-0 sm:px-0 snap-x snap-mandatory"></div>
+      </section>
+
+      <section>
+        <div class="flex items-baseline justify-between mb-4">
+          <h2 id="recommended-heading" class="text-xl sm:text-2xl font-semibold tracking-tight text-appleText">おすすめのアプリ</h2>
+          <span id="item-count-label" class="text-xs text-appleSecondary"></span>
+        </div>
+        <div id="recommended-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"></div>
+        <div id="empty-state" class="hidden py-16 text-center bg-white/70 rounded-[26px] border border-black/[0.03]">
+          <p class="text-base font-medium text-appleText">一致するアイテムが見つかりませんでした</p>
+          <p class="text-xs text-appleSecondary mt-1.5">別のキーワードで検索するか、フィルターを解除してください</p>
+          <button id="empty-reset-btn" class="mt-5 px-5 py-2 rounded-full bg-appleBlue text-white text-xs font-semibold hover:bg-appleBlueHover transition active:scale-95">すべて表示する</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 詳細 -->
+  <div id="detail-view" class="hidden min-h-screen pb-24">
+    <div id="detail-view-container" class="max-w-4xl mx-auto px-5 sm:px-10 pt-6 sm:pt-10"></div>
+  </div>
+
+  <!-- 左端スワイプハンドル -->
+  <div id="swipe-handle-zone" class="fixed left-0 top-1/2 -translate-y-1/2 z-40 w-10 h-36 flex items-center justify-start pl-1.5 cursor-grab active:cursor-grabbing select-none touch-none" role="button" tabindex="0" aria-label="サイドバーを開く">
+    <div id="swipe-handle-bar" class="w-[5px] h-[72px] rounded-full bg-neutral-400/80 hover:bg-neutral-600 shadow-sm backdrop-blur-md transition-all duration-200 handle-idle"></div>
+  </div>
+
+  <div id="sidebar-backdrop" class="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] opacity-0 pointer-events-none backdrop-transition" aria-hidden="true"></div>
+
+  <!-- サイドバー -->
+  <aside id="sidebar-drawer" class="fixed left-0 top-3 bottom-3 sm:top-5 sm:bottom-5 z-50 w-[290px] sm:w-[320px] bg-white/95 backdrop-blur-2xl rounded-r-[32px] shadow-apple-drawer-left border-r border-y border-white/60 flex flex-col justify-between -translate-x-full drawer-transition select-none" aria-label="ストアメニュー" aria-hidden="true">
+    <div id="drawer-inner-handle" class="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-28 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none" title="左へスワイプして閉じる">
+      <div class="w-[4px] h-14 rounded-full bg-neutral-300 hover:bg-neutral-400 transition-colors"></div>
+    </div>
+
+    <div class="pr-8 pl-6 pt-8 pb-6 overflow-y-auto no-scrollbar flex-1">
+      <div class="flex items-center justify-between mb-6">
+        <button id="sidebar-store-logo" class="text-[36px] font-extralight tracking-tight leading-none text-appleText hover:opacity-75 transition-opacity focus:outline-none">store</button>
+        <button id="close-sidebar-btn" class="w-8 h-8 rounded-full bg-applePill flex items-center justify-center text-appleSecondary hover:text-appleText hover:bg-neutral-200/80 transition active:scale-90" aria-label="メニューを閉じる">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="relative mb-6">
+        <svg class="w-4 h-4 text-appleSecondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+        <input id="sidebar-search-input" type="search" placeholder="アプリ、ゲーム、商品を検索" autocomplete="off" class="w-full pl-10 pr-8 py-2.5 rounded-2xl bg-applePill/90 text-sm text-appleText placeholder-appleSecondary focus:outline-none focus:ring-2 focus:ring-appleBlue/40 focus:bg-white transition" />
+        <button id="sidebar-search-clear" type="button" aria-label="検索をクリア" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-neutral-300/80 text-white flex items-center justify-center hover:bg-neutral-400 transition">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <nav class="space-y-2" aria-label="カテゴリ選択">
+        <button data-filter="all" class="nav-filter-btn w-full flex items-center justify-between px-4 py-3 rounded-2xl text-left text-[16px] font-medium text-appleText bg-applePill/80 hover:bg-applePill transition">
+          <span>すべて</span><span class="text-xs text-appleSecondary font-normal">Home</span>
+        </button>
+
+        <div class="rounded-2xl overflow-hidden transition-colors">
+          <button id="accordion-apps-btn" type="button" aria-expanded="false" class="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-left text-[17px] font-normal text-appleText hover:bg-applePill/70 active:bg-applePill transition">
+            <span class="flex items-center gap-3">
+              <svg class="w-5 h-5 text-appleBlue" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/>
+                <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/>
+              </svg>
+              <span>アプリ</span>
+            </span>
+            <svg id="accordion-chevron" class="w-4 h-4 text-appleSecondary transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="accordion-apps-panel" class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-out">
+            <div class="overflow-hidden">
+              <div class="pl-7 pr-2 pt-1 pb-2 space-y-1">
+                <button data-filter="game" class="nav-filter-btn w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-left text-[15px] font-normal text-appleText/90 hover:bg-applePill transition">
+                  <span class="flex items-center gap-2.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span><span>ゲーム</span></span>
+                  <span class="text-[11px] text-appleSecondary">Games</span>
+                </button>
+                <button data-filter="app" class="nav-filter-btn w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-left text-[15px] font-normal text-appleText/90 hover:bg-applePill transition">
+                  <span class="flex items-center gap-2.5"><span class="w-1.5 h-1.5 rounded-full bg-appleBlue"></span><span>アプリ</span></span>
+                  <span class="text-[11px] text-appleSecondary">Apps</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button data-filter="product" class="nav-filter-btn w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-left text-[17px] font-normal text-appleText hover:bg-applePill/70 active:bg-applePill transition">
+          <span class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 7.5h12l.75 11.25a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5L6 7.5z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 7.5V6a3 3 0 016 0v1.5"/>
+            </svg>
+            <span>商品</span>
+          </span>
+          <span class="text-[11px] text-appleSecondary">Products</span>
+        </button>
+      </nav>
+    </div>
+  </aside>
+
+  <div id="toast-notification" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-appleText/90 text-white text-xs font-medium shadow-lg backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 translate-y-3"></div>
+
+  <script>
+    // ===== 1. データ層（Supabase） =====
+    let STORE_ITEMS = [];
+    let sb = null;
+    let currentUserId = null;
+
+    function mapItem(r) {
+      return {
+        id: r.id, type: r.type, title: r.title, subtitle: r.subtitle, description: r.description,
+        categoryLabel: r.category_label, developer: r.developer, size: r.size, ageRating: r.age_rating,
+        priceText: r.price_text, subPriceNote: r.sub_price_note, trending: r.trending,
+        featuredBadge: r.featured_badge, highlights: r.highlights || [], previewGradients: r.preview_gradients || [],
+        gradient: r.gradient || 'from-neutral-800 to-neutral-900',
+        iconBg: r.icon_bg || 'bg-gradient-to-br from-neutral-500 to-neutral-700',
+        iconUrl: r.icon_url, previewImages: r.preview_images || [],
+        whatsNew: r.whats_new, rating: Number(r.rating), reviewsCount: r.reviews_count,
+        launchUrl: r.launch_url, openMode: r.open_mode, reviewsList: []
+      };
+    }
+
+    async function loadReviews(item) {
+      const { data } = await sb.from('reviews').select('*')
+        .eq('item_id', item.id).order('created_at', { ascending: false }).limit(50);
+      item.reviewsList = (data || []).map(r => ({
+        id: r.id, author: r.author || 'ゲストユーザー', rating: r.rating,
+        date: new Date(r.created_at).toLocaleDateString('ja-JP'),
+        title: r.title || `${r.rating}つ星の評価`, body: r.body || ''
+      }));
+    }
+
+    async function refreshItem(itemId) {
+      const { data } = await sb.from('items').select('*').eq('id', itemId).single();
+      const i = STORE_ITEMS.findIndex(x => x.id === itemId);
+      if (data && i >= 0) STORE_ITEMS[i] = { ...mapItem(data), reviewsList: STORE_ITEMS[i].reviewsList };
+    }
+
+    async function boot() {
+      const cfg = await fetch('/api/config').then(r => r.json());
+      sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) await sb.auth.signInAnonymously();
+      const { data: { user } } = await sb.auth.getUser();
+      currentUserId = user.id;
+
+      const [{ data: items, error }, { data: lib }] = await Promise.all([
+        sb.from('items').select('*').order('created_at'),
+        sb.from('library').select('item_id'),
+      ]);
+      if (error) return showToast('データの読み込みに失敗しました');
+      STORE_ITEMS = items.map(mapItem);
+      (lib || []).forEach(r => state.acquiredIds.add(r.item_id));
+      await applyStateFromHash();
+    }
+
+    // ===== 2. 状態管理 =====
+    const state = {
+      view: 'store', currentFilter: 'all', searchQuery: '', selectedItemId: null,
+      acquiredIds: new Set(), isSidebarOpen: false, isAppsExpanded: false,
+      selectedRatingInput: 5, isDragging: false, sidebarWidth: 320
+    };
+
+    const storeView = document.getElementById('store-view');
+    const detailView = document.getElementById('detail-view');
+    const detailViewContainer = document.getElementById('detail-view-container');
+    const mainHeaderTitle = document.getElementById('main-header-title');
+    const trendingSection = document.getElementById('trending-section');
+    const trendingContainer = document.getElementById('trending-container');
+    const recommendedContainer = document.getElementById('recommended-container');
+    const recommendedHeading = document.getElementById('recommended-heading');
+    const itemCountLabel = document.getElementById('item-count-label');
+    const emptyState = document.getElementById('empty-state');
+    const emptyResetBtn = document.getElementById('empty-reset-btn');
+    const filterBadgeContainer = document.getElementById('filter-badge-container');
+    const filterBadgeText = document.getElementById('filter-badge-text');
+    const clearFilterBtn = document.getElementById('clear-filter-btn');
+    const resetHomeBtn = document.getElementById('reset-home-btn');
+    const swipeHandleZone = document.getElementById('swipe-handle-zone');
+    const swipeHandleBar = document.getElementById('swipe-handle-bar');
+    const drawerInnerHandle = document.getElementById('drawer-inner-handle');
+    const sidebarDrawer = document.getElementById('sidebar-drawer');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const sidebarStoreLogo = document.getElementById('sidebar-store-logo');
+    const sidebarSearchInput = document.getElementById('sidebar-search-input');
+    const sidebarSearchClear = document.getElementById('sidebar-search-clear');
+    const accordionAppsBtn = document.getElementById('accordion-apps-btn');
+    const accordionAppsPanel = document.getElementById('accordion-apps-panel');
+    const accordionChevron = document.getElementById('accordion-chevron');
+    const navFilterBtns = document.querySelectorAll('.nav-filter-btn');
+    const toastNotification = document.getElementById('toast-notification');
+
+    // ===== 3. ルーター（ハッシュ同期） =====
+    function syncHashFromState(replace = false) {
+      let targetHash = '#home';
+      if (state.view === 'detail' && state.selectedItemId) targetHash = `#item/${state.selectedItemId}`;
+      else if (state.searchQuery.trim() !== '') targetHash = `#search?q=${encodeURIComponent(state.searchQuery.trim())}`;
+      else if (state.currentFilter !== 'all') targetHash = `#category/${state.currentFilter}`;
+      if (location.hash !== targetHash) {
+        replace ? history.replaceState(null, '', targetHash) : history.pushState(null, '', targetHash);
+      }
+    }
+
+    async function applyStateFromHash() {
+      const hash = location.hash || '#home';
+      if (hash.startsWith('#item/')) {
+        const id = hash.slice('#item/'.length);
+        const item = STORE_ITEMS.find(i => i.id === id);
+        if (item) {
+          state.view = 'detail'; state.selectedItemId = id; state.selectedRatingInput = 5;
+          await loadReviews(item);
+          renderApp();
+          return;
+        }
+      }
+      if (hash.startsWith('#category/')) {
+        const cat = hash.slice('#category/'.length);
+        if (['game', 'app', 'product'].includes(cat)) {
+          state.view = 'store'; state.currentFilter = cat; state.searchQuery = '';
+          sidebarSearchInput.value = ''; sidebarSearchClear.classList.add('hidden');
+          renderApp();
+          return;
+        }
+      }
+      if (hash.startsWith('#search')) {
+        const q = decodeURIComponent(hash.split('?q=')[1] || '');
+        state.view = 'store'; state.searchQuery = q;
+        sidebarSearchInput.value = q;
+        sidebarSearchClear.classList.toggle('hidden', q === '');
+        renderApp();
+        return;
+      }
+      state.view = 'store'; state.selectedItemId = null;
+      renderApp();
+    }
+    window.addEventListener('hashchange', applyStateFromHash);
+
+    function navigateToHome(resetSearch = true) {
+      state.view = 'store'; state.currentFilter = 'all'; state.selectedItemId = null;
+      if (resetSearch) { state.searchQuery = ''; sidebarSearchInput.value = ''; sidebarSearchClear.classList.add('hidden'); }
+      syncHashFromState();
+      renderApp();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function navigateToCategory(filterType) {
+      state.view = 'store'; state.currentFilter = filterType; state.selectedItemId = null;
+      state.searchQuery = ''; sidebarSearchInput.value = ''; sidebarSearchClear.classList.add('hidden');
+      syncHashFromState();
+      renderApp();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function navigateToDetail(itemId) {
+      const item = STORE_ITEMS.find(i => i.id === itemId);
+      if (item) await loadReviews(item);
+      state.view = 'detail'; state.selectedItemId = itemId; state.selectedRatingInput = 5;
+      syncHashFromState();
+      renderApp();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    // ===== 4. 描画 =====
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function iconHtml(item) {
+      return item.iconUrl
+        ? `<img src="${escapeHtml(item.iconUrl)}" alt="" class="w-full h-full object-cover">`
+        : `<span class="text-white text-xl font-bold">${escapeHtml(item.title.charAt(0))}</span>`;
+    }
+
+    function getButtonLabel(item) {
+      if (state.acquiredIds.has(item.id)) return item.type === 'product' ? 'カート済' : '開く';
+      return item.priceText;
+    }
+
+    function renderStarsStatic(v) {
+      const full = Math.round(v);
+      let s = '';
+      for (let i = 1; i <= 5; i++) s += `<span class="${i <= full ? 'text-amber-400' : 'text-neutral-300'}">★</span>`;
+      return s;
+    }
+
+    function renderApp() {
+      updateSidebarNavHighlight();
+      if (state.view === 'detail' && state.selectedItemId) {
+        const item = STORE_ITEMS.find(i => i.id === state.selectedItemId);
+        if (item) {
+          storeView.classList.add('hidden');
+          detailView.classList.remove('hidden');
+          renderDetailPage(item);
+          return;
+        }
+      }
+      detailView.classList.add('hidden');
+      storeView.classList.remove('hidden');
+      renderStoreFeed();
+    }
+
+    function updateSidebarNavHighlight() {
+      navFilterBtns.forEach(btn => {
+        const active = state.view === 'store' && state.searchQuery === '' && btn.dataset.filter === state.currentFilter;
+        btn.classList.toggle('bg-appleBlue', active);
+        btn.classList.toggle('text-white', active);
+        btn.classList.toggle('font-medium', active);
+        btn.classList.toggle('hover:bg-applePill', !active);
+        const sub = btn.querySelector('span:last-child');
+        if (sub) sub.classList.toggle('text-white/80', active), sub.classList.toggle('text-appleSecondary', !active);
+      });
+    }
+
+    function renderStoreFeed() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = STORE_ITEMS.filter(item => {
+        if (state.currentFilter !== 'all' && item.type !== state.currentFilter) return false;
+        if (!q) return true;
+        return [item.title, item.subtitle, item.categoryLabel, item.description]
+          .some(v => (v || '').toLowerCase().includes(q));
+      });
+
+      const labelMap = {
+        all: { title: 'store', heading: 'おすすめのアプリ・商品' },
+        game: { title: 'ゲーム', heading: 'おすすめのゲーム' },
+        app: { title: 'アプリ', heading: 'おすすめのアプリ' },
+        product: { title: '商品', heading: 'おすすめの商品' }
+      };
+      const meta = labelMap[state.currentFilter];
+
+      if (q) {
+        mainHeaderTitle.textContent = `検索結果: ${state.searchQuery.trim()}`;
+        filterBadgeContainer.classList.remove('hidden');
+        filterBadgeText.textContent = '検索を閉じる';
+        recommendedHeading.textContent = '一致するアイテム';
+        trendingSection.classList.add('hidden');
+      } else if (state.currentFilter !== 'all') {
+        mainHeaderTitle.textContent = meta.title;
+        filterBadgeContainer.classList.remove('hidden');
+        filterBadgeText.textContent = 'storeに戻る';
+        recommendedHeading.textContent = meta.heading;
+        trendingSection.classList.remove('hidden');
+      } else {
+        mainHeaderTitle.textContent = 'store';
+        filterBadgeContainer.classList.add('hidden');
+        recommendedHeading.textContent = meta.heading;
+        trendingSection.classList.remove('hidden');
+      }
+
+      itemCountLabel.textContent = `${filtered.length}件のアイテム`;
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        recommendedContainer.innerHTML = '';
+        trendingContainer.innerHTML = '';
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      if (!q) {
+        const trending = filtered.filter(i => i.trending);
+        const show = trending.length ? trending : filtered.slice(0, 2);
+        trendingContainer.innerHTML = show.map(item => `
+          <article data-item-id="${escapeHtml(item.id)}" class="item-card-trigger group relative flex-shrink-0 w-[85vw] sm:w-[390px] md:w-[420px] h-[340px] sm:h-[370px] rounded-[26px] overflow-hidden shadow-apple-card hover:shadow-apple-card-hover transition-all duration-300 cursor-pointer snap-start bg-gradient-to-br ${item.gradient} flex flex-col justify-between p-6 sm:p-7 text-white select-none">
+            <div class="relative z-10">
+              <span class="inline-block text-[11px] font-semibold uppercase tracking-wider text-white/75 mb-1.5">${escapeHtml(item.featuredBadge || item.categoryLabel)}</span>
+              <h3 class="text-2xl sm:text-[28px] font-bold tracking-tight leading-snug">${escapeHtml(item.title)}</h3>
+              <p class="text-sm text-white/80 mt-1.5 line-clamp-2 font-normal leading-relaxed">${escapeHtml(item.subtitle)}</p>
+            </div>
+            <div class="relative z-10 flex items-center justify-between gap-3 pt-4 mt-auto border-t border-white/15">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-12 h-12 squircle overflow-hidden ${item.iconBg} flex items-center justify-center shadow-md flex-shrink-0">${iconHtml(item)}</div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold truncate text-white">${escapeHtml(item.title)}</div>
+                  <div class="text-[11px] text-white/70 truncate">${escapeHtml(item.categoryLabel)}</div>
+                </div>
+              </div>
+              <button data-action-id="${escapeHtml(item.id)}" class="acquire-btn flex-shrink-0 px-5 py-1.5 rounded-full text-xs sm:text-[13px] font-bold tracking-wide transition-all active:scale-90 ${state.acquiredIds.has(item.id) ? 'bg-white/25 text-white backdrop-blur-md' : 'bg-white text-appleBlue hover:bg-white/95 shadow-sm'}">${escapeHtml(getButtonLabel(item))}</button>
+            </div>
+          </article>`).join('');
+      }
+
+      recommendedContainer.innerHTML = filtered.map(item => {
+        const acquired = state.acquiredIds.has(item.id);
+        return `
+          <article data-item-id="${escapeHtml(item.id)}" class="item-card-trigger group bg-appleCard rounded-[22px] p-4 sm:p-5 shadow-apple-card hover:shadow-apple-card-hover transition-all duration-300 cursor-pointer flex items-center justify-between gap-4 border border-black/[0.03]">
+            <div class="flex items-center gap-3.5 sm:gap-4 min-w-0">
+              <div class="w-14 h-14 sm:w-16 sm:h-16 squircle overflow-hidden ${item.iconBg} flex items-center justify-center shadow-sm flex-shrink-0">${iconHtml(item)}</div>
+              <div class="min-w-0">
+                <h3 class="text-[15px] sm:text-base font-semibold text-appleText truncate">${escapeHtml(item.title)}</h3>
+                <p class="text-xs text-appleSecondary line-clamp-1 mt-0.5">${escapeHtml(item.subtitle)}</p>
+                <div class="flex items-center gap-2 mt-1.5 text-[11px] text-appleSecondary">
+                  <span class="inline-flex items-center gap-0.5 text-amber-500 font-medium">★ <span class="text-appleText/80">${Number(item.rating).toFixed(1)}</span></span>
+                  <span>·</span><span class="truncate">${escapeHtml(item.categoryLabel)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-col items-center flex-shrink-0">
+              <button data-action-id="${escapeHtml(item.id)}" class="acquire-btn min-w-[74px] px-4 py-1.5 rounded-full text-xs sm:text-[13px] font-bold transition-all active:scale-90 ${acquired ? 'bg-applePill text-appleSecondary' : 'bg-applePill text-appleBlue hover:bg-appleBlue hover:text-white'}">${escapeHtml(getButtonLabel(item))}</button>
+              <span class="text-[9px] text-appleSecondary mt-1 text-center leading-tight max-w-[76px] truncate">${escapeHtml(item.subPriceNote)}</span>
+            </div>
+          </article>`;
+      }).join('');
+
+      attachCardListeners();
+    }
+
+    function renderDetailPage(item) {
+      const acquired = state.acquiredIds.has(item.id);
+      const related = STORE_ITEMS.filter(i => i.id !== item.id && i.type === item.type).slice(0, 2);
+      const backLabelMap = { all: 'store', game: 'ゲーム', app: 'アプリ', product: '商品' };
+      const backLabel = state.searchQuery.trim() ? '検索結果' : (backLabelMap[state.currentFilter] || 'store');
+
+      detailViewContainer.innerHTML = `
+        <div class="spa-view-enter space-y-6">
+          <div class="flex items-center justify-between">
+            <button id="spa-back-btn" class="inline-flex items-center gap-1.5 px-3.5 py-2 -ml-2 rounded-full text-appleBlue hover:bg-appleBlue/10 active:scale-95 transition text-sm sm:text-base font-medium">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+              <span>${escapeHtml(backLabel)}</span>
+            </button>
+          </div>
+
+          <div class="bg-appleCard rounded-[30px] p-6 sm:p-10 shadow-apple-card border border-black/[0.03]">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div class="flex items-center gap-5 sm:gap-6">
+                <div class="w-24 h-24 sm:w-28 sm:h-28 squircle overflow-hidden ${item.iconBg} flex items-center justify-center shadow-lg flex-shrink-0">${iconHtml(item)}</div>
+                <div>
+                  <span class="text-xs font-semibold text-appleBlue tracking-wide">${escapeHtml(item.categoryLabel)}</span>
+                  <h1 class="text-2xl sm:text-4xl font-bold tracking-tight text-appleText mt-1">${escapeHtml(item.title)}</h1>
+                  <p class="text-sm sm:text-base text-appleSecondary mt-1.5">${escapeHtml(item.subtitle)}</p>
+                  <p class="text-xs text-appleSecondary/80 mt-1">${escapeHtml(item.developer)}</p>
+                </div>
+              </div>
+              <div class="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-4 sm:pt-0 border-t sm:border-t-0 border-black/5">
+                <button id="detail-acquire-btn" class="px-8 py-2.5 rounded-full text-sm sm:text-base font-bold transition-all active:scale-95 ${acquired ? 'bg-applePill text-appleText' : 'bg-appleBlue text-white hover:bg-appleBlueHover shadow-md'}">${escapeHtml(getButtonLabel(item))}</button>
+                <span class="text-[11px] text-appleSecondary">${escapeHtml(item.subPriceNote)}</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 my-8 py-4 px-2 rounded-2xl bg-appleBg text-center">
+              <div><div class="text-[11px] text-appleSecondary">評価 (${item.reviewsCount.toLocaleString()}件)</div><div class="text-base sm:text-lg font-bold mt-0.5">★ ${Number(item.rating).toFixed(1)}</div></div>
+              <div class="border-x border-black/10"><div class="text-[11px] text-appleSecondary">対象 / 認証</div><div class="text-base sm:text-lg font-bold mt-0.5">${escapeHtml(item.ageRating)}</div></div>
+              <div><div class="text-[11px] text-appleSecondary">仕様 / 容量</div><div class="text-base sm:text-lg font-bold mt-0.5">${escapeHtml(item.size)}</div></div>
+            </div>
+
+            ${item.previewImages.length ? `
+              <div class="mb-8">
+                <h2 class="text-base sm:text-lg font-semibold mb-3.5">プレビュー</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  ${item.previewImages.map(src => `<img src="${escapeHtml(src)}" alt="" class="w-full h-48 sm:h-56 object-cover rounded-[22px] shadow-sm">`).join('')}
+                </div>
+              </div>` : ''}
+
+            <div class="space-y-4">
+              <h2 class="text-base sm:text-lg font-semibold">概要</h2>
+              <p class="text-sm sm:text-[15px] text-appleText/85 leading-relaxed">${escapeHtml(item.description)}</p>
+              ${item.highlights.length ? `
+                <div class="pt-2 flex flex-wrap gap-2">
+                  ${item.highlights.map(t => `<span class="px-3.5 py-1.5 rounded-full bg-appleBg text-xs font-medium text-appleText/80">${escapeHtml(t)}</span>`).join('')}
+                </div>` : ''}
+            </div>
+          </div>
+
+          ${item.whatsNew ? `
+            <div class="bg-appleCard rounded-[28px] p-6 sm:p-8 shadow-apple-card border border-black/[0.03]">
+              <div class="flex items-baseline justify-between mb-3">
+                <h2 class="text-lg sm:text-xl font-semibold">最新の変更</h2>
+                <span class="text-xs text-appleSecondary">${escapeHtml(item.whatsNew.date)}</span>
+              </div>
+              <div class="inline-block px-3 py-1 rounded-full bg-applePill text-xs font-medium text-appleText/80 mb-3">${escapeHtml(item.whatsNew.version)}</div>
+              <p class="text-sm text-appleText/85 leading-relaxed whitespace-pre-line">${escapeHtml(item.whatsNew.notes)}</p>
+            </div>` : ''}
+
+          <div class="bg-appleCard rounded-[28px] p-6 sm:p-8 shadow-apple-card border border-black/[0.03]">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-black/[0.06]">
+              <div>
+                <h2 class="text-lg sm:text-xl font-semibold">評価とレビュー</h2>
+                <p class="text-xs text-appleSecondary mt-1">ユーザーからの評価と感想</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="text-4xl sm:text-5xl font-bold tracking-tight">${Number(item.rating).toFixed(1)}</div>
+                <div>
+                  <div class="text-base tracking-wider">${renderStarsStatic(item.rating)}</div>
+                  <div class="text-xs text-appleSecondary mt-0.5">${item.reviewsCount.toLocaleString()}件の評価 (5段階)</div>
+                </div>
+              </div>
+            </div>
+
+            <form id="review-submit-form" class="mt-6 p-5 rounded-2xl bg-appleBg/80 space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">タップして評価・レビューを書く</span>
+                <div id="star-rating-selector" class="flex items-center gap-1">
+                  ${[1, 2, 3, 4, 5].map(s => `
+                    <button type="button" data-star="${s}" class="star-select-btn text-2xl sm:text-3xl leading-none transition-transform hover:scale-110 active:scale-95 focus:outline-none ${s <= state.selectedRatingInput ? 'text-amber-400' : 'text-neutral-300'}" aria-label="${s}つ星">★</button>`).join('')}
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input id="review-author-input" type="text" maxlength="30" placeholder="ニックネーム（任意）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
+                <input id="review-title-input" type="text" maxlength="50" placeholder="タイトル（例：とても使いやすい！）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
+              </div>
+              <textarea id="review-body-input" rows="3" maxlength="400" placeholder="感想を入力してください（評価のみでも送信できます）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40 resize-none"></textarea>
+              <div class="flex items-center justify-end">
+                <button type="submit" class="px-6 py-2 rounded-full bg-appleBlue text-white text-xs sm:text-sm font-semibold hover:bg-appleBlueHover active:scale-95 transition shadow-sm">評価とレビューを送信</button>
+              </div>
+            </form>
+
+            <div class="mt-6 space-y-3.5">
+              ${item.reviewsList.map(rev => `
+                <div class="p-4 sm:p-5 rounded-2xl bg-appleBg/50 border border-black/[0.03]">
+                  <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <span class="text-sm font-semibold">${escapeHtml(rev.title)}</span>
+                    <span class="text-[11px] text-appleSecondary flex-shrink-0">${escapeHtml(rev.date)}</span>
+                  </div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <div class="text-xs tracking-wide">${renderStarsStatic(rev.rating)}</div>
+                    <span class="text-[11px] text-appleSecondary">· ${escapeHtml(rev.author)}</span>
+                  </div>
+                  ${rev.body ? `<p class="text-xs sm:text-sm text-appleText/80 leading-relaxed">${escapeHtml(rev.body)}</p>` : ''}
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="bg-appleCard rounded-[28px] p-6 sm:p-8 shadow-apple-card border border-black/[0.03]">
+            <h2 class="text-base font-semibold mb-3">コードを引き換える</h2>
+            <div class="flex gap-2">
+              <input id="redeem-input" type="text" placeholder="引き換えコード" class="flex-1 px-4 py-2.5 rounded-xl bg-appleBg text-sm uppercase placeholder-appleSecondary focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
+              <button id="redeem-btn" class="px-5 py-2 rounded-full bg-appleBlue text-white text-sm font-semibold hover:bg-appleBlueHover active:scale-95 transition">引き換え</button>
+            </div>
+          </div>
+
+          ${related.length ? `
+            <div class="pt-2">
+              <h3 class="text-lg font-semibold mb-4">関連するアイテム</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                ${related.map(rel => `
+                  <div data-related-id="${escapeHtml(rel.id)}" class="related-card-trigger bg-appleCard rounded-[22px] p-4 shadow-apple-card hover:shadow-apple-card-hover transition cursor-pointer flex items-center justify-between gap-3 border border-black/[0.03]">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                      <div class="w-14 h-14 squircle overflow-hidden ${rel.iconBg} flex items-center justify-center flex-shrink-0">${iconHtml(rel)}</div>
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold truncate">${escapeHtml(rel.title)}</div>
+                        <div class="text-xs text-appleSecondary truncate mt-0.5">${escapeHtml(rel.subtitle)}</div>
+                      </div>
+                    </div>
+                    <span class="px-3.5 py-1.5 rounded-full bg-applePill text-appleBlue text-xs font-bold flex-shrink-0">詳細</span>
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+        </div>`;
+
+      document.getElementById('spa-back-btn').addEventListener('click', () => {
+        state.view = 'store'; state.selectedItemId = null;
+        syncHashFromState();
+        renderApp();
+      });
+      document.getElementById('detail-acquire-btn').addEventListener('click', (e) => handleAcquireAction(item.id, e.currentTarget));
+
+      document.querySelectorAll('.star-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = Number(btn.dataset.star);
+          state.selectedRatingInput = val;
+          document.querySelectorAll('.star-select-btn').forEach(s => {
+            const sv = Number(s.dataset.star);
+            s.classList.toggle('text-amber-400', sv <= val);
+            s.classList.toggle('text-neutral-300', sv > val);
+          });
+        });
+      });
+
+      document.getElementById('review-submit-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const author = document.getElementById('review-author-input').value.trim() || 'ゲストユーザー';
+        const title = document.getElementById('review-title-input').value.trim();
+        const body = document.getElementById('review-body-input').value.trim();
+        const rating = state.selectedRatingInput;
+
+        const { error } = await sb.from('reviews').upsert(
+          { item_id: item.id, user_id: currentUserId, author, rating, title: title || null, body: body || null },
+          { onConflict: 'item_id,user_id' }
+        );
+        if (error) return showToast('送信に失敗しました');
+
+        await refreshItem(item.id);
+        const fresh = STORE_ITEMS.find(i => i.id === item.id);
+        await loadReviews(fresh);
+        state.selectedRatingInput = 5;
+        showToast(title || body ? 'レビューと評価を送信しました' : `★${rating} の評価を送信しました`);
+        renderDetailPage(fresh);
+      });
+
+      document.getElementById('redeem-btn').addEventListener('click', () => {
+        redeemCode(document.getElementById('redeem-input').value.trim());
+      });
+
+      document.querySelectorAll('.related-card-trigger').forEach(card => {
+        card.addEventListener('click', () => navigateToDetail(card.dataset.relatedId));
+      });
+    }
+
+    function attachCardListeners() {
+      document.querySelectorAll('.acquire-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleAcquireAction(btn.dataset.actionId, btn);
+        });
+      });
+      document.querySelectorAll('.item-card-trigger').forEach(card => {
+        card.addEventListener('click', () => navigateToDetail(card.dataset.itemId));
+      });
+    }
+
+    // ===== 5. 入手・起動・引き換え =====
+    function openItem(item) {
+      if (item.type === 'product') return showToast(`「${item.title}」はカートに入っています`);
+      if (!item.launchUrl) return showToast(`「${item.title}」は起動先が未設定です`);
+      if (item.openMode === 'new_tab') window.open(item.launchUrl, '_blank');
+      else location.href = `/run.html?url=${encodeURIComponent(item.launchUrl)}&title=${encodeURIComponent(item.title)}`;
+    }
+
+    async function handleAcquireAction(itemId, btnElement) {
+      const item = STORE_ITEMS.find(i => i.id === itemId);
+      if (!item) return;
+      if (state.acquiredIds.has(itemId)) return openItem(item);
+
+      btnElement.disabled = true;
+      btnElement.innerHTML = `<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin-fast"></span>`;
+
+      const { error } = await sb.from('library').upsert(
+        { user_id: currentUserId, item_id: itemId },
+        { onConflict: 'user_id,item_id', ignoreDuplicates: true }
+      );
+      if (error) { btnElement.disabled = false; return showToast('追加に失敗しました'); }
+
+      state.acquiredIds.add(itemId);
+      renderApp();
+      showToast(item.type === 'product' ? `「${item.title}」をカートに追加しました` : `「${item.title}」を入手しました`);
+    }
+
+    async function redeemCode(code) {
+      if (!code) return showToast('コードを入力してください');
+      const { data: { session } } = await sb.auth.getSession();
+      const r = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ code }),
+      });
+      const j = await r.json();
+      if (!r.ok) return showToast(j.error);
+      state.acquiredIds.add(j.item_id);
+      renderApp();
+      showToast('コードを引き換えました');
+    }
+
+    let toastTimer = null;
+    function showToast(message) {
+      toastNotification.textContent = message;
+      toastNotification.classList.remove('opacity-0', 'translate-y-3');
+      toastNotification.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastNotification.classList.add('opacity-0', 'translate-y-3');
+        toastNotification.classList.remove('opacity-100', 'translate-y-0');
+      }, 2400);
+    }
+
+    // ===== 6. サイドバー（スワイプ） =====
+    function openSidebar() {
+      state.isSidebarOpen = true;
+      sidebarDrawer.classList.add('drawer-transition');
+      sidebarDrawer.style.transform = 'translateX(0px)';
+      sidebarDrawer.setAttribute('aria-hidden', 'false');
+      sidebarBackdrop.classList.remove('opacity-0', 'pointer-events-none');
+      sidebarBackdrop.classList.add('opacity-100');
+      swipeHandleZone.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    function closeSidebar() {
+      state.isSidebarOpen = false;
+      sidebarDrawer.classList.add('drawer-transition');
+      sidebarDrawer.style.transform = 'translateX(-100%)';
+      sidebarDrawer.setAttribute('aria-hidden', 'true');
+      sidebarBackdrop.classList.add('opacity-0', 'pointer-events-none');
+      sidebarBackdrop.classList.remove('opacity-100');
+      sidebarBackdrop.style.opacity = '';
+      swipeHandleZone.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    let pointerDownX = 0, pointerLastX = 0, hasMovedSignificant = false;
+
+    swipeHandleZone.addEventListener('pointerdown', (e) => {
+      state.isDragging = true;
+      hasMovedSignificant = false;
+      pointerDownX = pointerLastX = e.clientX;
+      state.sidebarWidth = sidebarDrawer.offsetWidth || 310;
+      swipeHandleZone.setPointerCapture(e.pointerId);
+      swipeHandleBar.classList.add('handle-active', 'scale-y-110', 'bg-appleBlue');
+      sidebarDrawer.classList.remove('drawer-transition');
+    });
+
+    swipeHandleZone.addEventListener('pointermove', (e) => {
+      if (!state.isDragging) return;
+      pointerLastX = e.clientX;
+      const dx = pointerLastX - pointerDownX;
+      if (Math.abs(dx) > 6) hasMovedSignificant = true;
+      if (dx > 0) {
+        const offset = Math.min(0, -state.sidebarWidth + dx);
+        sidebarDrawer.style.transform = `translateX(${offset}px)`;
+        sidebarBackdrop.style.opacity = String(Math.min(1, 1 - Math.abs(offset) / state.sidebarWidth));
+      }
+    });
+
+    function finishHandleGesture() {
+      if (!state.isDragging) return;
+      state.isDragging = false;
+      swipeHandleBar.classList.remove('handle-active', 'scale-y-110', 'bg-appleBlue');
+      sidebarBackdrop.style.opacity = '';
+      const dx = pointerLastX - pointerDownX;
+      if (!hasMovedSignificant || dx > 24) openSidebar();
+      else closeSidebar();
+    }
+    swipeHandleZone.addEventListener('pointerup', finishHandleGesture);
+    swipeHandleZone.addEventListener('pointercancel', finishHandleGesture);
+    swipeHandleZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSidebar(); }
+    });
+
+    let drawerDragActive = false, drawerStartX = 0, drawerDeltaX = 0;
+    drawerInnerHandle.addEventListener('pointerdown', (e) => {
+      drawerDragActive = true;
+      drawerStartX = e.clientX;
+      drawerDeltaX = 0;
+      drawerInnerHandle.setPointerCapture(e.pointerId);
+      sidebarDrawer.classList.remove('drawer-transition');
+    });
+    drawerInnerHandle.addEventListener('pointermove', (e) => {
+      if (!drawerDragActive) return;
+      drawerDeltaX = Math.min(0, e.clientX - drawerStartX);
+      sidebarDrawer.style.transform = `translateX(${drawerDeltaX}px)`;
+    });
+    function finishDrawerCloseGesture() {
+      if (!drawerDragActive) return;
+      drawerDragActive = false;
+      if (drawerDeltaX < -65 || drawerDeltaX === 0) closeSidebar();
+      else openSidebar();
+    }
+    drawerInnerHandle.addEventListener('pointerup', finishDrawerCloseGesture);
+    drawerInnerHandle.addEventListener('pointercancel', finishDrawerCloseGesture);
+
+    sidebarBackdrop.addEventListener('click', closeSidebar);
+    closeSidebarBtn.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.isSidebarOpen) closeSidebar(); });
+
+    // ===== 7. サイドバー内の検索・ナビ =====
+    sidebarSearchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      sidebarSearchClear.classList.toggle('hidden', state.searchQuery === '');
+      state.view = 'store'; state.selectedItemId = null;
+      syncHashFromState(true);
+      renderApp();
+    });
+    sidebarSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); closeSidebar(); }
+    });
+    sidebarSearchClear.addEventListener('click', () => {
+      state.searchQuery = '';
+      sidebarSearchInput.value = '';
+      sidebarSearchClear.classList.add('hidden');
+      sidebarSearchInput.focus();
+      syncHashFromState(true);
+      renderApp();
+    });
+
+    accordionAppsBtn.addEventListener('click', () => {
+      state.isAppsExpanded = !state.isAppsExpanded;
+      accordionAppsBtn.setAttribute('aria-expanded', String(state.isAppsExpanded));
+      accordionAppsPanel.classList.toggle('grid-rows-[1fr]', state.isAppsExpanded);
+      accordionAppsPanel.classList.toggle('grid-rows-[0fr]', !state.isAppsExpanded);
+      accordionChevron.classList.toggle('rotate-180', state.isAppsExpanded);
+    });
+
+    navFilterBtns.forEach(btn => {
+      btn.addEventListener('click', () => { navigateToCategory(btn.dataset.filter); closeSidebar(); });
+    });
+
+    clearFilterBtn.addEventListener('click', () => navigateToHome(true));
+    emptyResetBtn.addEventListener('click', () => navigateToHome(true));
+    resetHomeBtn.addEventListener('click', () => navigateToHome(true));
+    sidebarStoreLogo.addEventListener('click', () => { navigateToHome(true); closeSidebar(); });
+
+    // ===== 8. 起動 =====
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>
