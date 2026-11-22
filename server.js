@@ -45,6 +45,11 @@ const app = express();
 app.use(express.json({ limit: '3mb' }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
+// 新しい画面（TypeScript React）は /next/ で配信する。ビルド済み（client/dist）があるときだけ有効
+const CLIENT_DIST = path.join(process.cwd(), 'client', 'dist');
+app.use('/next', express.static(CLIENT_DIST, { index: false }));
+app.get(/^\/next(\/.*)?$/, (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
+
 const sb = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const turso = createTurso({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN });
 await turso.execute(`CREATE TABLE IF NOT EXISTS images (
