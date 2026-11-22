@@ -95,7 +95,7 @@
     pointer-events: auto;
   }
 
-  /* 中央配置用（終了確認ダイアログ） */
+  /* 中央配置用 */
   .wrap.center {
     align-items: center;
     padding: 20px;
@@ -123,7 +123,7 @@
     transform: translateY(0);
   }
 
-  /* 中央ガラスカード（終了確認モーダル） */
+  /* 中央ガラスカード */
   .wrap.center .sheet {
     border-radius: 26px;
     border: 1px solid var(--glass-border);
@@ -155,12 +155,11 @@
     margin-bottom: 8px;
   }
 
-  /* SenninPay バッジ */
+  /* SenninPay バッジ（点なし） */
   .brand-badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 11px;
+    padding: 5px 12px;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
@@ -170,13 +169,6 @@
     border: 1px solid rgba(255, 255, 255, 0.9);
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12), inset 0 1px 0 #fff;
     white-space: nowrap;
-  }
-  .brand-badge::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   }
 
   .sheet p {
@@ -258,6 +250,94 @@
     opacity: 0.5;
     cursor: default;
   }
+
+  /* ===== 支払い完了アニメーション ===== */
+  .pay-done-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0 16px;
+    text-align: center;
+    animation: fadeIn 0.25s ease forwards;
+  }
+  .check-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 10px 26px rgba(37, 99, 235, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    animation: popScale 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  .check-circle svg {
+    width: 34px;
+    height: 34px;
+    stroke: #fff;
+    stroke-width: 3.2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .check-path {
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: drawCheck 0.4s 0.18s ease-out forwards;
+  }
+  .pay-done-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+  .pay-done-sub {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d4ed8;
+    margin: 0;
+  }
+
+  @keyframes popScale {
+    0% { transform: scale(0.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes drawCheck {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== ポイント獲得モーダル用装飾 ===== */
+  .award-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 12px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(245, 158, 11, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    animation: popScale 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  .award-icon svg {
+    width: 30px;
+    height: 30px;
+    fill: currentColor;
+  }
+  .award-amt {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #d97706;
+    margin: 4px 0;
+  }
 </style>
 </head>
 <body>
@@ -305,19 +385,50 @@
 <!-- 支払いの確認（SenninPay） -->
 <div id="pay" class="wrap" role="dialog" aria-modal="true">
   <div class="sheet">
-    <div class="sheet-header">
-      <h3>ポイントを支払いますか？</h3>
-      <span class="brand-badge">SenninPay</span>
+    <!-- 支払い確認画面 -->
+    <div id="payFormView">
+      <div class="sheet-header">
+        <h3>ポイントを支払いますか？</h3>
+        <span class="brand-badge">SenninPay</span>
+      </div>
+      <div class="pay-box">
+        <div id="payTitle" class="pay-item-name"></div>
+        <div id="payAmt" class="amt"></div>
+      </div>
+      <p>仙人ポイント残高から引き落とされます。</p>
+      <div id="payErr" class="err"></div>
+      <div class="row">
+        <button id="payCancel" class="btn sec" type="button">キャンセル</button>
+        <button id="payOk" class="btn pri" type="button">支払う</button>
+      </div>
     </div>
-    <div class="pay-box">
-      <div id="payTitle" class="pay-item-name"></div>
-      <div id="payAmt" class="amt"></div>
+
+    <!-- 支払い完了アニメーション画面 -->
+    <div id="payDoneView" class="pay-done-view" hidden>
+      <div class="check-circle">
+        <svg viewBox="0 0 36 36">
+          <path class="check-path" d="M8 18.5l7 7L28 11" />
+        </svg>
+      </div>
+      <div class="pay-done-title">お支払い完了</div>
+      <div id="payDoneAmt" class="pay-done-sub"></div>
     </div>
-    <p>仙人ポイント残高から引き落とされます。</p>
-    <div id="payErr" class="err"></div>
+  </div>
+</div>
+
+<!-- ポイント獲得モーダル -->
+<div id="awardModal" class="wrap center" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="award-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z"/>
+      </svg>
+    </div>
+    <h3>ポイントを獲得しました！</h3>
+    <div id="awardAmt" class="award-amt"></div>
+    <p id="awardReason" style="font-weight:500; color:#111827;"></p>
     <div class="row">
-      <button id="payCancel" class="btn sec" type="button">キャンセル</button>
-      <button id="payOk" class="btn pri" type="button">支払う</button>
+      <button id="awardOk" class="btn pri" type="button">OK</button>
     </div>
   </div>
 </div>
@@ -352,7 +463,6 @@
     startX = clientX;
     startY = clientY;
 
-    // fixedの位置をpx指定に切り替えてからドラッグ開始
     menuBtn.style.top = initialY + 'px';
     menuBtn.style.right = 'auto';
     menuBtn.style.left = initialX + 'px';
@@ -370,7 +480,6 @@
     let newX = initialX + dx;
     let newY = initialY + dy;
 
-    // 画面外に出ないように制限
     const maxX = window.innerWidth - menuBtn.offsetWidth;
     const maxY = window.innerHeight - menuBtn.offsetHeight;
     newX = Math.max(10, Math.min(newX, maxX - 10));
@@ -384,7 +493,6 @@
     isDragging = false;
   }
 
-  // マウスイベント
   menuBtn.addEventListener('mousedown', (e) => {
     onDragStart(e.clientX, e.clientY);
   });
@@ -395,7 +503,6 @@
     onDragEnd();
   });
 
-  // タッチイベント (スマホ・タブレット)
   menuBtn.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
       onDragStart(e.touches[0].clientX, e.touches[0].clientY);
@@ -410,9 +517,8 @@
     onDragEnd();
   });
 
-  // ドラッグしていなければ「クリック(タップ)」としてメニューを開く
-  menuBtn.onclick = (e) => {
-    if (hasMoved) return; // ドラッグした場合は開かない
+  menuBtn.onclick = () => {
+    if (hasMoved) return;
     $('#exitModal').classList.add('open');
   };
 
@@ -542,8 +648,12 @@
   };
   $('#consentNo').onclick = () => { location.href = '/'; };
 
+  // ===== 支払い確認 & 完了アニメーション =====
   function showPay(req) {
     payReq = req;
+    // フォーム表示をリセット
+    $('#payFormView').hidden = false;
+    $('#payDoneView').hidden = true;
     $('#payTitle').textContent = req.title;
     $('#payAmt').textContent = `${Number(req.amount).toLocaleString('ja-JP')} pt`;
     $('#payErr').textContent = '';
@@ -562,7 +672,7 @@
 
   $('#payOk').onclick = async () => {
     const req = payReq;
-    if (!req || req.inFlight) return;
+    if (!req || req.inFlight || req.completing) return;
     req.inFlight = true;
     $('#payOk').disabled = true;
     $('#payCancel').disabled = true;
@@ -571,7 +681,17 @@
       body: JSON.stringify({ amount: req.amount, title: req.title, requestId: req.requestId }),
     });
     req.inFlight = false;
-    if (r.ok) return closePay({ ok: true, data: r.body });
+    if (r.ok) {
+      // 支払い完了アニメーションを表示してから閉じる
+      req.completing = true;
+      $('#payDoneAmt').textContent = `${Number(req.amount).toLocaleString('ja-JP')} pt 支払いました`;
+      $('#payFormView').hidden = true;
+      $('#payDoneView').hidden = false;
+      setTimeout(() => {
+        closePay({ ok: true, data: r.body });
+      }, 1250);
+      return;
+    }
     if (r.status === 0 || r.status === 503) {
       $('#payErr').textContent = r.body.error || '通信に失敗しました。もう一度「支払う」を押してください。';
       $('#payOk').disabled = false;
@@ -582,8 +702,37 @@
   };
 
   $('#payCancel').onclick = () => {
-    if (!payReq || payReq.inFlight) return;
+    if (!payReq || payReq.inFlight || payReq.completing) return;
     closePay({ ok: false, code: 'cancelled', error: 'お支払いを取り消しました。' });
+  };
+
+  // 支払いモーダル外側タップでキャンセル
+  $('#pay').onclick = (e) => {
+    if (e.target === $('#pay')) {
+      $('#payCancel').onclick();
+    }
+  };
+
+  // ===== ポイント獲得モーダル =====
+  function showAwardModal(amount, reason) {
+    $('#awardAmt').textContent = `+${Number(amount).toLocaleString('ja-JP')} pt`;
+    const reasonEl = $('#awardReason');
+    if (reason && reason.trim()) {
+      reasonEl.textContent = reason.trim();
+      reasonEl.hidden = false;
+    } else {
+      reasonEl.hidden = true;
+    }
+    $('#awardModal').classList.add('open');
+  }
+
+  function closeAwardModal() {
+    $('#awardModal').classList.remove('open');
+  }
+
+  $('#awardOk').onclick = closeAwardModal;
+  $('#awardModal').onclick = (e) => {
+    if (e.target === $('#awardModal')) closeAwardModal();
   };
 
   async function handle(type, data) {
@@ -615,6 +764,8 @@
       });
       if (!r.ok) return { ok: false, code: r.body.code || 'error', error: r.body.error || 'ポイントを配れませんでした。', points: r.body.remaining };
       refresh();
+      // ポイント獲得モーダルを表示
+      showAwardModal(data.amount, data.reason);
       return { ok: true, data: r.body };
     }
     return { ok: false, code: 'unknown_request', error: '対応していない依頼です。' };
@@ -639,7 +790,8 @@
 
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (payReq) { if (!payReq.inFlight) $('#payCancel').onclick(); return; }
+    if (payReq) { if (!payReq.inFlight && !payReq.completing) $('#payCancel').onclick(); return; }
+    if ($('#awardModal').classList.contains('open')) { closeAwardModal(); return; }
     if ($('#exitModal').classList.contains('open')) { $('#exitModal').classList.remove('open'); return; }
     if ($('#consent').classList.contains('open')) $('#consentNo').onclick();
   });
