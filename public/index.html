@@ -57,7 +57,7 @@
       grid.innerHTML = '<p class="empty" style="grid-column:1/-1">仙人アカウントでログインすると、入手したアプリがここに表示されます<br><a href="/auth/login?next=/" style="color:#007AFF">ログイン</a></p>';
     } else {
       const owned = new Set(b.library);
-      apps = b.items.filter(i => owned.has(i.id) && i.launch_url);
+      apps = b.items.filter(i => owned.has(i.id) && i.has_app);
       grid.innerHTML = apps.length ? apps.map(i => `
         <div class="app-item" data-id="${esc(i.id)}" role="button">
           <div class="app-icon">
@@ -75,8 +75,7 @@
       if (!el) return;
       const item = apps.find(x => x.id === el.dataset.id);
       if (!item) return;
-      if (item.open_mode === 'new_tab') window.open(item.launch_url, '_blank');
-      else location.href = `/run.html?url=${encodeURIComponent(item.launch_url)}&title=${encodeURIComponent(item.title)}`;
+      location.href = `/run.html?id=${encodeURIComponent(item.id)}&title=${encodeURIComponent(item.title)}`;
     });
 
     window.filterApps = () => {

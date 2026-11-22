@@ -197,7 +197,7 @@
         iconBg: r.icon_bg || 'bg-gradient-to-br from-neutral-500 to-neutral-700',
         iconUrl: r.thumbnail_url || r.icon_url, previewImages: r.preview_images || [],
         whatsNew: r.whats_new, rating: Number(r.rating), reviewsCount: r.reviews_count,
-        launchUrl: r.launch_url, openMode: r.open_mode, reviewsList: []
+        hasApp: !!r.has_app, reviewsList: []
       };
     }
 
@@ -683,10 +683,8 @@
 
     // ===== 5. 入手・購入・起動・引き換え（仙人ポイント） =====
     function openItem(item) {
-      if (item.type === 'product') return showToast('購入済みです');
-      if (!item.launchUrl) return showToast(`「${item.title}」は起動先が未設定です`);
-      if (item.openMode === 'new_tab') window.open(item.launchUrl, '_blank');
-      else location.href = `/run.html?url=${encodeURIComponent(item.launchUrl)}&title=${encodeURIComponent(item.title)}`;
+      if (!item.hasApp) return showToast(`「${item.title}」はまだ準備中です`);
+      location.href = `/run.html?id=${encodeURIComponent(item.id)}&title=${encodeURIComponent(item.title)}`;
     }
 
     function requireLogin() {

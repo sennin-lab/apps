@@ -5,76 +5,315 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>起動中</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #000; }
-  #app { border: 0; width: 100%; height: calc(100% - 64px); display: block; background: #fff; }
-  .bar { height: 64px; display: flex; align-items: center; justify-content: space-between;
-         padding: 0 16px; background: #111; color: #fff; font-family: -apple-system, sans-serif; }
-  .home { color: #fff; background: #333; border-radius: 999px; padding: 10px 20px;
-          text-decoration: none; font-size: 15px; }
-  .fallback { color: #fff; font-size: 13px; }
-  #title { font-size: 14px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+  html, body { margin: 0; height: 100%; background: #000; font-family: -apple-system, system-ui, sans-serif; }
+  #app { border: 0; width: 100%; height: calc(100% - 64px); display: none; background: #fff; }
+  .bar { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #111; color: #fff; box-sizing: border-box; }
+  .home { color: #fff; background: #333; border-radius: 999px; padding: 10px 20px; text-decoration: none; font-size: 15px; }
+  #title { font-size: 14px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+  #msg { color: #fff; padding: 24px; line-height: 1.7; }
+  .wrap { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .wrap.open { display: flex; }
+  .sheet { background: #fff; color: #111; border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px)); width: 100%; max-width: 520px; box-sizing: border-box; }
+  .sheet h3 { margin: 0 0 8px; font-size: 17px; }
+  .sheet p { font-size: 14px; color: #444; line-height: 1.6; margin: 6px 0; }
+  .amt { font-size: 28px; font-weight: 700; margin: 12px 0 4px; }
+  .err { color: #c00; font-size: 13px; min-height: 1.2em; margin-top: 8px; }
+  .row { display: flex; gap: 10px; margin-top: 14px; }
+  .btn { flex: 1; border: 0; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn.pri { background: #2563eb; color: #fff; }
+  .btn.sec { background: #eee; color: #111; }
+  .btn:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
 <body>
-<iframe id="app" allow="fullscreen; clipboard-write"></iframe>
+<iframe id="app" sandbox="allow-scripts" allow="fullscreen; clipboard-write"></iframe>
+<div id="msg" hidden></div>
 <div class="bar">
   <a class="home" href="/">🏠 ホーム</a>
   <span id="title"></span>
-  <a class="fallback" id="fallback" target="_blank" rel="noopener">別タブ</a>
+  <span></span>
 </div>
+
+<!-- 許可の確認（ポイントを配るアプリを、初めて開くとき） -->
+<div id="consent" class="wrap" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <h3>アプリに情報を渡しますか？</h3>
+    <p id="consentText"></p>
+    <p>許可しないと、このアプリは開けません。許可したあとも、いつでも取り消せます。</p>
+    <div id="consentErr" class="err"></div>
+    <div class="row">
+      <button id="consentNo" class="btn sec" type="button">ホームに戻る</button>
+      <button id="consentOk" class="btn pri" type="button">許可する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 支払いの確認（アプリが支払いを依頼したとき。利用者が「支払う」を押すまで払われない） -->
+<div id="pay" class="wrap" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <h3>ポイントを支払いますか？</h3>
+    <p id="payTitle"></p>
+    <div id="payAmt" class="amt"></div>
+    <p>仙人ポイントから引き落とされます。</p>
+    <div id="payErr" class="err"></div>
+    <div class="row">
+      <button id="payCancel" class="btn sec" type="button">キャンセル</button>
+      <button id="payOk" class="btn pri" type="button">支払う</button>
+    </div>
+  </div>
+</div>
+
 <script>
+  const CH = 'sennin-app';
   const p = new URLSearchParams(location.search);
-  const url = p.get('url');
-  const title = p.get('title') || '';
-  const frame = document.getElementById('app');
-  if (url && /^https?:\/\//.test(url)) {
-    frame.src = url;
-    document.getElementById('fallback').href = url;
-  }
-  document.getElementById('title').textContent = title;
-  document.title = title;
+  const id = p.get('id') || '';
+  const enc = encodeURIComponent(id);
+  const $ = (s) => document.querySelector(s);
+  const frame = $('#app');
+  $('#title').textContent = p.get('title') || '';
+  document.title = p.get('title') || '起動中';
 
-  // ===== アプリ内課金ブリッジ（仙人ポイント） =====
-  // iframe内のアプリは次のように依頼できる:
-  //   parent.postMessage({ type: 'sennin:iap', action: 'purchase', sku: 'pro_unlock', requestId: '1' }, '*');
-  //   parent.postMessage({ type: 'sennin:iap', action: 'owned', requestId: '2' }, '*');
-  // 結果は 'sennin:iap:result'（requestId 付き）で返る。購入は利用者の確認後にのみ実行される。
-  async function api(path, body) {
-    const r = await fetch(path, {
-      method: body ? 'POST' : 'GET',
-      credentials: 'same-origin',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
+  let access = null;     // 直近の /access の応答
+  let payReq = null;     // 確認中の支払い { amount, title, requestId, resolve, inFlight }
+
+  // ===== サーバーとの通信 =====
+  async function call(path, init = {}) {
+    try {
+      const r = await fetch(path, {
+        credentials: 'same-origin',
+        method: init.method || 'GET',
+        headers: init.body !== undefined ? { 'content-type': 'application/json' } : undefined,
+        body: init.body,
+      });
+      const body = await r.json().catch(() => ({}));
+      return { ok: r.ok && body.ok !== false, status: r.status, body };
+    } catch {
+      return { ok: false, status: 0, body: { error: '通信に失敗しました。時間をおいてお試しください。', code: 'network' } };
+    }
+  }
+
+  async function refresh() {
+    const r = await call(`/api/apps/${enc}/access`);
+    if (r.status === 401) {
+      location.assign(`/auth/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+      return null;
+    }
+    if (!r.ok) { showMsg(r.body.error || 'このアプリは開けません（入手していない、または準備中です）'); return null; }
+    access = r.body;
+    return access;
+  }
+
+  // ===== 起動 =====
+  async function start() {
+    if (!id) return showMsg('アプリが指定されていません');
+    const a = await refresh();
+    if (!a) return;
+    if (a.needsConsent && !a.consented) return showConsent(a);
+    await openFrame();
+  }
+
+  async function openFrame() {
+    const r = await fetch(`/api/apps/${enc}/html`, { credentials: 'same-origin' });
+    if (r.status === 401) return location.assign(`/auth/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+    if (!r.ok) return showMsg('このアプリは開けません（入手していない、または準備中です）');
+    frame.srcdoc = injectBridge(await r.text());
+    frame.style.display = 'block';
+    $('#msg').hidden = true;
+  }
+
+  // アプリの HTML の先頭に、window.senninapp（依頼を親画面へ取り次ぐ小さな関数）を入れる
+  function injectBridge(html) {
+    const script = `<script>(${appBridge.toString()})(${JSON.stringify(CH)});<\/script>`;
+    return /<head[^>]*>/i.test(html)
+      ? html.replace(/<head[^>]*>/i, (m) => m + script)
+      : script + html;
+  }
+
+  // ===== アプリの中で動く部分（文字列にして埋め込む。外のスコープは使わない） =====
+  function appBridge(channel) {
+    var pending = {};
+    var seq = 0;
+    function newId() { seq += 1; return seq + '-' + Math.random().toString(36).slice(2, 10); }
+    function makeRequestId() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+    function call(type, data, timeoutMs) {
+      return new Promise(function (resolve, reject) {
+        var id = newId();
+        var timer = setTimeout(function () {
+          delete pending[id];
+          var e = new Error('ホームからの応答がありませんでした。');
+          e.code = 'timeout';
+          reject(e);
+        }, timeoutMs || 20000);
+        pending[id] = function (m) {
+          clearTimeout(timer);
+          if (m.ok) resolve(m.data);
+          else {
+            var e = new Error(m.error || '失敗しました。');
+            e.code = m.code || 'error';
+            e.points = m.points;
+            reject(e);
+          }
+        };
+        parent.postMessage({ channel: channel, id: id, type: type, data: data || {} }, '*');
+      });
+    }
+    window.addEventListener('message', function (e) {
+      if (e.source !== parent) return;
+      var m = e.data;
+      if (!m || m.channel !== channel || !pending[m.id]) return;
+      var f = pending[m.id];
+      delete pending[m.id];
+      f(m);
     });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
-    return j;
+    window.senninapp = {
+      // 利用者の名前と、仙人アカウントの連携の有無（許可が必要）
+      account: function () { return call('account'); },
+      // 許可しているか
+      consent: function () { return call('consent'); },
+      // 利用者が確認画面で「支払う」を押したときだけ払われる。requestId を同じにすると押し直しても二重には払わない
+      charge: function (amount, title, requestId) {
+        return call('charge', { amount: amount, title: title, requestId: requestId || makeRequestId() }, 180000);
+      },
+      // 利用者にポイントを配る（許可が必要。管理者が決めた上限の中でだけ配られる）
+      award: function (amount, reason, requestId) {
+        return call('award', { amount: amount, reason: reason || '', requestId: requestId || makeRequestId() });
+      }
+    };
   }
-  const reply = (requestId, payload) =>
-    frame.contentWindow && frame.contentWindow.postMessage({ type: 'sennin:iap:result', requestId, ...payload }, '*');
 
-  window.addEventListener('message', async (e) => {
+  // ===== 許可 =====
+  function showConsent(a) {
+    const g = a.grant ? `このアプリは、ポイントを配ることがあります（あと ${Number(a.grant.remaining).toLocaleString('ja-JP')}pt まで）。` : '';
+    $('#consentText').textContent = `あなたの表示名と、仙人アカウントの連携の有無を、このアプリに渡します。${g}`;
+    $('#consentErr').textContent = '';
+    $('#consent').classList.add('open');
+  }
+
+  $('#consentOk').onclick = async () => {
+    $('#consentOk').disabled = true;
+    const r = await call(`/api/apps/${enc}/consent`, { method: 'POST', body: '{}' });
+    $('#consentOk').disabled = false;
+    if (!r.ok) { $('#consentErr').textContent = r.body.error || '許可できませんでした。もう一度お試しください。'; return; }
+    $('#consent').classList.remove('open');
+    await refresh();
+    await openFrame();
+  };
+  $('#consentNo').onclick = () => { location.href = '/'; };
+
+  // ===== 支払いの確認 =====
+  function showPay(req) {
+    payReq = req;
+    $('#payTitle').textContent = `「${req.title}」`;
+    $('#payAmt').textContent = `${Number(req.amount).toLocaleString('ja-JP')} pt`;
+    $('#payErr').textContent = '';
+    $('#payOk').disabled = false;
+    $('#payCancel').disabled = false;
+    $('#pay').classList.add('open');
+  }
+
+  function closePay(reply) {
+    const req = payReq;
+    if (!req) return;
+    payReq = null;
+    $('#pay').classList.remove('open');
+    req.resolve(reply);
+  }
+
+  $('#payOk').onclick = async () => {
+    const req = payReq;
+    if (!req || req.inFlight) return;
+    req.inFlight = true;
+    $('#payOk').disabled = true;
+    $('#payCancel').disabled = true;
+    const r = await call(`/api/apps/${enc}/charge`, {
+      method: 'POST',
+      body: JSON.stringify({ amount: req.amount, title: req.title, requestId: req.requestId }),
+    });
+    req.inFlight = false;
+    if (r.ok) return closePay({ ok: true, data: r.body });
+    // 結果が分からない通信・サーバーの失敗は、同じ requestId で押し直せるように画面を残す
+    if (r.status === 0 || r.status === 503) {
+      $('#payErr').textContent = r.body.error || '通信に失敗しました。もう一度「支払う」を押してください。';
+      $('#payOk').disabled = false;
+      $('#payCancel').disabled = false;
+      return;
+    }
+    closePay({ ok: false, code: r.body.code || 'error', error: r.body.error || '支払えませんでした。', points: r.body.points });
+  };
+
+  $('#payCancel').onclick = () => {
+    if (!payReq || payReq.inFlight) return;
+    closePay({ ok: false, code: 'cancelled', error: 'お支払いを取り消しました。' });
+  };
+
+  // ===== 枠からの依頼を受けて、答える =====
+  async function handle(type, data) {
+    if (type === 'account') {
+      const a = await refresh();
+      if (!a) return { ok: false, code: 'error', error: 'アカウント情報を取得できませんでした。' };
+      if (!a.consented) return { ok: false, code: 'not_consented', error: consentText(a) };
+      return { ok: true, data: { sub: a.user.sub, name: a.user.name, sennin: a.sennin, grant: a.grant } };
+    }
+    if (type === 'consent') {
+      return access?.consented
+        ? { ok: true, data: { consented: true } }
+        : { ok: false, code: 'not_consented', error: consentText(access) };
+    }
+    if (type === 'charge') {
+      const amount = data.amount;
+      const title = typeof data.title === 'string' ? data.title.trim() : '';
+      const requestIdValue = typeof data.requestId === 'string' ? data.requestId : '';
+      if (!Number.isInteger(amount) || amount < 1) return { ok: false, code: 'invalid', error: '支払うポイントは 1 以上の整数で指定してください。' };
+      if (!title) return { ok: false, code: 'invalid', error: '品名を指定してください。' };
+      if (payReq) return { ok: false, code: 'busy', error: 'ほかの支払いの確認が出ています。' };
+      // 利用者が「支払う」か「キャンセル」を押すまで、答えは返さない
+      return new Promise((resolve) => showPay({ amount, title, requestId: requestIdValue, resolve }));
+    }
+    if (type === 'award') {
+      if (!access?.consented) return { ok: false, code: 'not_consented', error: consentText(access) };
+      const r = await call(`/api/apps/${enc}/award`, {
+        method: 'POST',
+        body: JSON.stringify({ amount: data.amount, reason: data.reason, requestId: data.requestId }),
+      });
+      if (!r.ok) return { ok: false, code: r.body.code || 'error', error: r.body.error || 'ポイントを配れませんでした。', points: r.body.remaining };
+      refresh();
+      return { ok: true, data: r.body };
+    }
+    return { ok: false, code: 'unknown_request', error: '対応していない依頼です。' };
+  }
+
+  function consentText(a) {
+    return a && a.needsConsent
+      ? 'ユーザー情報の共有を許可していません。アプリを開き直すと、確認が出ます。'
+      : 'このアプリでは、ユーザー情報は使えません。';
+  }
+
+  window.addEventListener('message', (e) => {
     if (e.source !== frame.contentWindow) return;
     const m = e.data;
-    if (!m || m.type !== 'sennin:iap') return;
-    const { requestId, action, sku } = m;
-    try {
-      if (action === 'owned') {
-        const r = await api('/api/iap/owned');
-        return reply(requestId, { ok: true, skus: r.skus });
-      }
-      if (action === 'purchase') {
-        const q = await api(`/api/iap/products/${encodeURIComponent(sku)}`);
-        const ok = confirm(`「${q.item_title}」の「${q.name}」を ${Number(q.price_points).toLocaleString()} pt で購入しますか？\n仙人ポイントから引き落とされます。`);
-        if (!ok) return reply(requestId, { ok: false, error: 'キャンセルされました' });
-        const r = await api('/api/iap/purchase', { sku });
-        return reply(requestId, { ok: true, sku, points: r.points ?? null, already: !!r.already });
-      }
-      reply(requestId, { ok: false, error: '不明な操作です' });
-    } catch (err) {
-      reply(requestId, { ok: false, error: err.message, status: err.status ?? null });
-    }
+    if (!m || m.channel !== CH || typeof m.id !== 'string' || typeof m.type !== 'string') return;
+    handle(m.type, m.data || {}).then((reply) => {
+      frame.contentWindow && frame.contentWindow.postMessage({ channel: CH, id: m.id, ...reply }, '*');
+    }).catch((err) => {
+      frame.contentWindow && frame.contentWindow.postMessage({ channel: CH, id: m.id, ok: false, code: 'error', error: String(err.message || err) }, '*');
+    });
   });
+
+  // Escape：支払いの確認は閉じる（通信中は閉じない）。許可の確認は、ホームに戻る
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (payReq) { if (!payReq.inFlight) $('#payCancel').onclick(); return; }
+    if ($('#consent').classList.contains('open')) $('#consentNo').onclick();
+  });
+
+  function showMsg(text) {
+    const el = $('#msg');
+    el.textContent = text;
+    el.hidden = false;
+    frame.style.display = 'none';
+  }
+
+  start();
 </script>
 </body>
 </html>

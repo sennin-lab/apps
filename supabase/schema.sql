@@ -61,6 +61,13 @@ create table items (
 create index items_status_idx on items(status);
 create index items_owner_idx on items(owner_sub);
 
+-- アプリ本体（HTML）。公開APIには出さず、所有者・購入者だけが取得する
+create table app_sources (
+  item_id text primary key references items(id) on delete cascade,
+  html text not null,
+  updated_at timestamptz not null default now()
+);
+
 -- アプリ内課金の商品（SKU単位・仙人ポイント）
 create table iap_products (
   sku text primary key,
@@ -145,3 +152,4 @@ alter table library enable row level security;
 alter table purchases enable row level security;
 alter table reviews enable row level security;
 alter table codes enable row level security;
+alter table app_sources enable row level security;

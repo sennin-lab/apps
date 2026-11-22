@@ -18,116 +18,142 @@
 <main id="app" class="hidden max-w-6xl mx-auto p-4 grid lg:grid-cols-[260px_1fr] gap-4">
   <aside class="bg-white rounded-2xl p-4 shadow space-y-3 h-fit">
     <div class="flex items-center justify-between">
-      <h2 class="font-semibold">作品</h2>
+      <h2 class="font-semibold">マイアプリ</h2>
       <button id="newBtn" type="button" class="text-sm px-3 py-1.5 rounded-full bg-blue-600 text-white">＋ 新規</button>
     </div>
     <ul id="list" class="divide-y text-sm max-h-[70vh] overflow-y-auto"></ul>
+    <a href="/api/studio/spec" target="_blank" class="block text-xs text-blue-600 underline">アプリの仕様（AI・開発者向け）を見る</a>
   </aside>
 
   <div class="space-y-4 min-w-0">
     <section class="bg-white rounded-2xl p-5 shadow">
-      <div class="flex items-center justify-between mb-3 gap-3">
-        <h2 id="editTitle" class="font-semibold text-lg truncate">作品の編集</h2>
-        <span id="statusBadge" class="text-xs px-2.5 py-1 rounded-full bg-gray-100 whitespace-nowrap"></span>
+      <div class="flex items-center justify-between mb-4 gap-3">
+        <h2 id="editTitle" class="font-semibold text-lg truncate">新しいアプリ</h2>
+        <span id="statusBadge" class="text-xs px-2.5 py-1 rounded-full bg-gray-100 whitespace-nowrap">未保存</span>
       </div>
-      <form id="form" class="grid sm:grid-cols-2 gap-3 text-sm">
-        <label>ID（英小文字・数字・-）<input name="id" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>種類
-          <select name="type" class="w-full border rounded-lg px-2.5 py-1.5">
-            <option value="app">アプリ</option><option value="game">ゲーム</option><option value="product">商品</option>
-          </select>
-        </label>
-        <label class="sm:col-span-2">タイトル<input name="title" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label class="sm:col-span-2">サブタイトル<input name="subtitle" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label class="sm:col-span-2">説明<textarea name="description" rows="3" class="w-full border rounded-lg px-2.5 py-1.5"></textarea></label>
-        <label>カテゴリ<input name="category_label" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>開発元<input name="developer" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>サイズ<input name="size" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>年齢/認証<input name="age_rating" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>価格（仙人ポイント・0で無料）<input name="price_points" type="number" min="0" value="0" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>価格の補足<input name="sub_price_note" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>バッジ<input name="featured_badge" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label>起動方法
-          <select name="open_mode" class="w-full border rounded-lg px-2.5 py-1.5">
-            <option value="iframe">ホーム内で表示</option><option value="new_tab">別タブで開く</option>
-          </select>
-        </label>
-        <label class="sm:col-span-2">ハイライト（カンマ区切り）<input name="highlights" class="w-full border rounded-lg px-2.5 py-1.5"></label>
-        <label class="sm:col-span-2">起動URL（https://）<input name="launch_url" class="w-full border rounded-lg px-2.5 py-1.5"></label>
 
-        <div class="sm:col-span-2 grid sm:grid-cols-2 gap-3 pt-3 border-t">
+      <form id="form" class="space-y-5 text-sm">
+        <label class="block">アプリ名<input name="title" required maxlength="80" class="mt-1 w-full border rounded-lg px-3 py-2"></label>
+        <label class="block">説明<textarea name="description" rows="3" maxlength="2000" class="mt-1 w-full border rounded-lg px-3 py-2"></textarea></label>
+
+        <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <div class="font-medium mb-1">サムネイル（ストアのカード用）</div>
-            <div id="thumbPreview" class="mb-2"></div>
-            <input type="file" id="thumbFile" accept="image/*" class="text-xs">
-          </div>
-          <div>
-            <div class="font-medium mb-1">アイコン</div>
+            <div class="font-medium mb-1">アプリアイコン</div>
             <div id="iconPreview" class="mb-2"></div>
             <input type="file" id="iconFile" accept="image/*" class="text-xs">
           </div>
-        </div>
-        <div class="sm:col-span-2">
-          <div class="font-medium mb-1">作品の画像（プレビュー）</div>
-          <div id="previewList" class="grid grid-cols-3 gap-2 mb-2"></div>
-          <input type="file" id="previewFiles" accept="image/*" multiple class="text-xs">
-          <p class="text-[11px] text-gray-500 mt-1">jpg / png / webp、1枚2MB以下。アップロードは即時、反映は「保存」で確定します。</p>
+          <div>
+            <div class="font-medium mb-1">アプリ画像</div>
+            <div id="imagePreview" class="mb-2"></div>
+            <input type="file" id="imageFile" accept="image/*" class="text-xs">
+          </div>
         </div>
 
-        <div class="sm:col-span-2 flex flex-wrap items-center gap-2 pt-3 border-t">
-          <label class="admin-only hidden items-center gap-1">状態
-            <select name="status" class="border rounded-lg px-2 py-1.5">
-              <option value="draft">下書き</option><option value="in_review">審査中</option>
-              <option value="published">公開</option><option value="suspended">停止</option>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <div class="font-medium">HTMLソースコード</div>
+            <label class="text-xs text-blue-600 cursor-pointer">ファイルから読み込む
+              <input type="file" id="htmlFile" accept=".html,.htm,text/html" class="hidden">
+            </label>
+          </div>
+          <textarea name="app_html" rows="12" spellcheck="false" placeholder="<!DOCTYPE html>&#10;<html>..." class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+          <p class="text-[11px] text-gray-500 mt-1">1つのHTMLファイル（CSS・JavaScriptを含む）として実行されます。外部サイトのCookieやログイン情報にはアクセスできません。</p>
+        </div>
+
+        <details class="border rounded-lg p-3">
+          <summary class="cursor-pointer font-medium">詳細設定（任意）</summary>
+          <div class="grid sm:grid-cols-2 gap-3 mt-3">
+            <label>販売価格（仙人ポイント・0で無料）<input name="price_points" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg px-3 py-2"></label>
+            <label class="admin-only hidden">状態
+              <select name="status" class="mt-1 w-full border rounded-lg px-3 py-2">
+                <option value="draft">下書き</option><option value="in_review">審査中</option>
+                <option value="published">公開</option><option value="suspended">停止</option>
+              </select>
+            </label>
+            <label class="admin-only hidden flex items-center gap-2"><input type="checkbox" name="trending"> トレンドに表示</label>
+          </div>
+        </details>
+
+        <div class="flex flex-wrap items-center gap-2 pt-4 border-t">
+          <button type="button" id="deleteBtn" class="text-red-600 text-sm px-3 py-2 invisible">削除</button>
+          <span class="flex-1"></span>
+          <button type="button" id="submitBtn" class="text-sm px-4 py-2 rounded-full bg-gray-100 invisible">審査に出す</button>
+          <button class="text-sm px-5 py-2 rounded-full bg-blue-600 text-white font-semibold">保存</button>
+        </div>
+        <p id="saveMsg" class="text-sm text-green-700"></p>
+      </form>
+    </section>
+
+    <section id="extras" class="hidden space-y-4">
+      <section class="bg-white rounded-2xl p-5 shadow">
+        <h2 class="font-semibold mb-3">売上・ポイント配布</h2>
+        <div id="finance" class="text-sm space-y-3"></div>
+        <details class="mt-4 text-sm">
+          <summary class="cursor-pointer font-medium">アプリからポイントを使う（コード例）</summary>
+          <pre class="mt-2 bg-gray-50 border rounded-lg p-3 text-xs overflow-x-auto whitespace-pre">// 利用者が確認画面で「支払う」を押したときだけ払われる
+const r = await senninapp.charge(100, 'ヒント');   // 10〜1000pt（認定開発者は5000pt）
+
+// ポイントを配る（利用者の許可が必要。管理者の上限の中でだけ配られる）
+await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
+        </details>
+      </section>
+
+      <section class="bg-white rounded-2xl p-5 shadow">
+        <h2 class="font-semibold mb-3">レビュー</h2>
+        <ul id="reviewList" class="space-y-3 text-sm"></ul>
+      </section>
+    </section>
+
+    <section id="adminBox" class="hidden bg-white rounded-2xl p-5 shadow space-y-6">
+      <h2 class="font-semibold">管理者</h2>
+
+      <div class="space-y-2">
+        <h3 class="font-medium">ポイント配布の上限</h3>
+        <form id="grantForm" class="grid sm:grid-cols-6 gap-2 items-end text-sm">
+          <label class="sm:col-span-2">アプリ<select name="item_id" id="grantItem" class="w-full border rounded-lg px-2 py-1.5"></select></label>
+          <label>合計の上限(pt)<input name="max_points" type="number" min="0" required class="w-full border rounded-lg px-2 py-1.5"></label>
+          <label>1回の上限(pt)<input name="per_call_max" type="number" min="1" value="500" required class="w-full border rounded-lg px-2 py-1.5"></label>
+          <label>1人1分の上限(pt)<input name="per_user_minute_max" type="number" min="0" value="0" class="w-full border rounded-lg px-2 py-1.5"></label>
+          <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="active"> 配布する</label>
+          <p id="grantInfo" class="sm:col-span-6 text-xs text-gray-500"></p>
+          <button class="sm:col-span-6 justify-self-end bg-blue-600 text-white px-4 py-2 rounded-full">保存</button>
+        </form>
+        <ul id="grantList" class="divide-y text-xs"></ul>
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-medium">認定開発者</h3>
+        <form id="certForm" class="flex flex-wrap gap-2 items-end text-sm">
+          <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
+          <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="certified" checked> 認定する</label>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
+        </form>
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-medium">権限</h3>
+        <form id="roleForm" class="flex flex-wrap gap-2 items-end text-sm">
+          <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
+          <label>権限
+            <select name="role" class="border rounded-lg px-2 py-1.5">
+              <option value="developer">開発者</option><option value="user">一般</option>
             </select>
           </label>
-          <label class="admin-only hidden items-center gap-1"><input type="checkbox" name="trending"> トレンドに表示</label>
-          <span class="flex-1"></span>
-          <button type="button" id="deleteBtn" class="text-red-600 text-sm px-3 py-1.5">削除</button>
-          <button type="button" id="submitBtn" class="text-sm px-4 py-2 rounded-full bg-gray-100">審査に出す</button>
-          <button class="text-sm px-5 py-2 rounded-full bg-blue-600 text-white font-semibold">保存</button>
-          <p id="saveMsg" class="w-full text-sm text-green-700"></p>
-        </div>
-      </form>
-    </section>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
+        </form>
+      </div>
 
-    <section class="bg-white rounded-2xl p-5 shadow">
-      <h2 class="font-semibold mb-3">レビュー</h2>
-      <ul id="reviewList" class="space-y-3 text-sm"></ul>
-    </section>
-
-    <section class="bg-white rounded-2xl p-5 shadow">
-      <h2 class="font-semibold mb-3">アプリ内課金（仙人ポイント）</h2>
-      <ul id="iapList" class="divide-y text-sm mb-3"></ul>
-      <form id="iapForm" class="grid sm:grid-cols-5 gap-2 text-sm items-end">
-        <label>SKU<input name="sku" required pattern="[A-Za-z0-9_.:\-]{3,64}" class="w-full border rounded-lg px-2 py-1.5"></label>
-        <label class="sm:col-span-2">名称<input name="name" required class="w-full border rounded-lg px-2 py-1.5"></label>
-        <label>価格pt<input name="price_points" type="number" min="1" required class="w-full border rounded-lg px-2 py-1.5"></label>
-        <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="consumable" checked> 消費型</label>
-        <button class="sm:col-span-5 justify-self-end bg-blue-600 text-white px-4 py-2 rounded-full">追加</button>
-      </form>
-    </section>
-
-    <section id="adminBox" class="hidden bg-white rounded-2xl p-5 shadow space-y-4">
-      <h2 class="font-semibold">管理者</h2>
-      <form id="roleForm" class="flex flex-wrap gap-2 items-end text-sm">
-        <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
-        <label>権限
-          <select name="role" class="border rounded-lg px-2 py-1.5">
-            <option value="developer">開発者</option><option value="user">一般</option>
-          </select>
-        </label>
-        <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
-      </form>
-      <h3 class="font-medium">引き換えコード</h3>
-      <form id="codeForm" class="flex flex-wrap gap-2 items-end text-sm">
-        <label>作品<select name="item_id" id="codeItem" class="border rounded-lg px-2 py-1.5"></select></label>
-        <label>コード（空欄で自動）<input name="code" class="border rounded-lg px-2 py-1.5 uppercase"></label>
-        <label>使用上限<input name="max_uses" type="number" value="1" min="1" class="border rounded-lg px-2 py-1.5 w-24"></label>
-        <label>期限<input name="expires_at" type="datetime-local" class="border rounded-lg px-2 py-1.5"></label>
-        <button class="bg-blue-600 text-white px-4 py-2 rounded-full">発行</button>
-      </form>
-      <ul id="codeList" class="divide-y text-sm"></ul>
+      <div class="space-y-2">
+        <h3 class="font-medium">引き換えコード</h3>
+        <form id="codeForm" class="flex flex-wrap gap-2 items-end text-sm">
+          <label>アプリ<select name="item_id" id="codeItem" class="border rounded-lg px-2 py-1.5"></select></label>
+          <label>コード（空欄で自動）<input name="code" class="border rounded-lg px-2 py-1.5 uppercase"></label>
+          <label>使用上限<input name="max_uses" type="number" value="1" min="1" class="border rounded-lg px-2 py-1.5 w-24"></label>
+          <label>期限<input name="expires_at" type="datetime-local" class="border rounded-lg px-2 py-1.5"></label>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">発行</button>
+        </form>
+        <ul id="codeList" class="divide-y text-sm"></ul>
+      </div>
     </section>
   </div>
 </main>
@@ -136,8 +162,9 @@
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safe = (fn) => async (...args) => { try { await fn(...args); } catch (err) { alert(err.message); } };
+  const pt = (n) => `${Number(n || 0).toLocaleString('ja-JP')} pt`;
   const STATUS_LABEL = { draft: '下書き', in_review: '審査中', published: '公開中', suspended: '停止中' };
-  let me = null, items = [], cur = null;
+  let me = null, items = [], cur = null, grants = [];
   const isAdmin = () => me?.role === 'admin';
 
   async function api(path, { method = 'GET', body, form } = {}) {
@@ -155,12 +182,12 @@
     if (!me) {
       $('#gate').classList.remove('hidden');
       $('#gate').innerHTML = `<h1 class="text-xl font-semibold">senninstudio for apps</h1>
-        <p class="text-sm text-gray-600">作品の公開・サムネイル・画像・レビューの管理は、仙人アカウントでログインして行います。</p>
+        <p class="text-sm text-gray-600">アプリの公開・管理は、仙人アカウントでログインして行います。</p>
         <a href="/auth/login?next=${encodeURIComponent('/studio.html')}" class="block text-center bg-blue-600 text-white rounded-lg py-2 font-semibold">仙人アカウントでログイン</a>`;
       return;
     }
     $('#whoami').innerHTML = `<span>${esc(me.name || 'ユーザー')}</span>
-      <span class="text-gray-500">${me.points == null ? '' : Number(me.points).toLocaleString() + ' pt'}</span>
+      <span class="text-gray-500">${me.points == null ? (me.linked ? '' : '未連携') : pt(me.points)}</span>
       <code class="text-[11px] text-gray-400 hidden sm:inline">${esc(me.sub)}</code>
       <form method="post" action="/auth/logout"><button class="text-gray-500 underline">ログアウト</button></form>`;
 
@@ -174,9 +201,9 @@
 
     $('#app').classList.remove('hidden');
     document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
-    if (isAdmin()) $('#adminBox').classList.remove('hidden');
+    if (isAdmin()) { $('#adminBox').classList.remove('hidden'); }
     await loadList();
-    if (isAdmin()) await loadCodes();
+    if (isAdmin()) await loadAdmin();
     await showEditor(null);
   }
 
@@ -185,8 +212,8 @@
     $('#list').innerHTML = items.map(i => `
       <li><button type="button" data-id="${esc(i.id)}" class="w-full text-left py-2 ${cur && cur.id === i.id ? 'text-blue-600 font-semibold' : ''}">
         <div>${esc(i.title)}</div>
-        <div class="text-xs text-gray-500">${STATUS_LABEL[i.status] || esc(i.status)} · ${i.price_points ? Number(i.price_points).toLocaleString() + ' pt' : '無料'} · ★${Number(i.rating).toFixed(1)}</div>
-      </button></li>`).join('') || '<li class="py-3 text-gray-400">作品はまだありません</li>';
+        <div class="text-xs text-gray-500">${STATUS_LABEL[i.status] || esc(i.status)} · ${i.price_points ? pt(i.price_points) : '無料'} · ★${Number(i.rating).toFixed(1)}</div>
+      </button></li>`).join('') || '<li class="py-3 text-gray-400">アプリはまだありません</li>';
   }
 
   $('#list').addEventListener('click', (e) => {
@@ -196,40 +223,38 @@
   $('#newBtn').onclick = () => showEditor(null).catch(err => alert(err.message));
 
   async function showEditor(item) {
-    cur = item ? { ...item } : { preview_images: [], icon_url: null, thumbnail_url: null };
+    cur = item ? { ...item } : { preview_images: [], icon_url: null };
     const f = $('#form');
     f.reset();
     if (item) for (const [k, v] of Object.entries(item)) {
       const el = f.elements[k];
-      if (!el) continue;
+      if (!el || el.type === 'file') continue;
       if (el.type === 'checkbox') el.checked = !!v;
-      else el.value = Array.isArray(v) ? v.join(', ') : (v ?? '');
+      else el.value = v ?? '';
     }
-    f.elements.id.readOnly = !!item;
-    $('#editTitle').textContent = item ? `作品の編集：${item.title}` : '新しい作品';
+    $('#editTitle').textContent = item ? item.title : '新しいアプリ';
     $('#statusBadge').textContent = item ? (STATUS_LABEL[item.status] || item.status) : '未保存';
     $('#deleteBtn').classList.toggle('invisible', !item);
     $('#submitBtn').classList.toggle('invisible', !item);
     $('#saveMsg').textContent = '';
     renderImages();
+    $('#extras').classList.toggle('hidden', !item);
     if (item) {
-      await Promise.all([loadReviews(item.id), loadIap(item.id)]);
+      const { html } = await api(`/api/studio/items/${encodeURIComponent(item.id)}/source`);
+      f.elements.app_html.value = html;
+      await Promise.all([loadReviews(item.id), loadFinance(item.id)]);
     } else {
-      $('#reviewList').innerHTML = '<li class="text-gray-400">作品を保存すると表示されます</li>';
-      $('#iapList').innerHTML = '<li class="text-gray-400 py-2">作品を保存すると設定できます</li>';
+      f.elements.app_html.value = '';
     }
   }
 
   // ===== 画像 =====
   function renderImages() {
-    const slot = (url, clear) => url
-      ? `<div class="relative inline-block"><img src="${esc(url)}" class="w-24 h-24 object-cover rounded-xl"><button type="button" data-clear="${clear}" class="absolute -top-2 -right-2 bg-white shadow rounded-full w-6 h-6 text-xs">✕</button></div>`
-      : '<div class="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center text-xs text-gray-400">未設定</div>';
-    $('#thumbPreview').innerHTML = slot(cur.thumbnail_url, 'thumbnail_url');
-    $('#iconPreview').innerHTML = slot(cur.icon_url, 'icon_url');
-    $('#previewList').innerHTML = cur.preview_images.map((u, i) => `
-      <div class="relative"><img src="${esc(u)}" class="w-full h-28 object-cover rounded-xl">
-        <button type="button" data-pidx="${i}" class="absolute top-1 right-1 bg-white shadow rounded-full w-6 h-6 text-xs">✕</button></div>`).join('');
+    const slot = (url) => url
+      ? `<img src="${esc(url)}" class="w-32 h-32 object-cover rounded-2xl">`
+      : '<div class="w-32 h-32 rounded-2xl bg-gray-100 flex items-center justify-center text-xs text-gray-400">未設定</div>';
+    $('#iconPreview').innerHTML = slot(cur.icon_url);
+    $('#imagePreview').innerHTML = slot(cur.preview_images[0]);
   }
 
   async function uploadFile(file) {
@@ -238,26 +263,17 @@
     return (await api('/api/studio/images', { method: 'POST', form: fd })).url;
   }
 
-  $('#form').addEventListener('click', (e) => {
-    const c = e.target.closest('[data-clear]');
-    if (c) { cur[c.dataset.clear] = null; return renderImages(); }
-    const p = e.target.closest('[data-pidx]');
-    if (p) { cur.preview_images.splice(Number(p.dataset.pidx), 1); renderImages(); }
-  });
-  $('#thumbFile').onchange = safe(async (e) => {
-    const file = e.target.files[0]; e.target.value = '';
-    if (!file) return;
-    cur.thumbnail_url = await uploadFile(file); renderImages();
-  });
   $('#iconFile').onchange = safe(async (e) => {
     const file = e.target.files[0]; e.target.value = '';
-    if (!file) return;
-    cur.icon_url = await uploadFile(file); renderImages();
+    if (file) { cur.icon_url = await uploadFile(file); renderImages(); }
   });
-  $('#previewFiles').onchange = safe(async (e) => {
-    const files = [...e.target.files]; e.target.value = '';
-    for (const file of files) cur.preview_images.push(await uploadFile(file));
-    renderImages();
+  $('#imageFile').onchange = safe(async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (file) { cur.preview_images = [await uploadFile(file)]; renderImages(); }
+  });
+  $('#htmlFile').onchange = safe(async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (file) $('#form').elements.app_html.value = await file.text();
   });
 
   // ===== 保存・審査・削除 =====
@@ -265,12 +281,13 @@
     e.preventDefault();
     const f = e.target.elements;
     const body = {
-      id: f.id.value.trim(), type: f.type.value, title: f.title.value, subtitle: f.subtitle.value,
-      description: f.description.value, category_label: f.category_label.value, developer: f.developer.value,
-      size: f.size.value, age_rating: f.age_rating.value, price_points: f.price_points.value,
-      sub_price_note: f.sub_price_note.value, featured_badge: f.featured_badge.value,
-      open_mode: f.open_mode.value, highlights: f.highlights.value, launch_url: f.launch_url.value,
-      icon_url: cur.icon_url, thumbnail_url: cur.thumbnail_url, preview_images: cur.preview_images,
+      id: cur?.id || '',
+      title: f.title.value,
+      description: f.description.value,
+      icon_url: cur.icon_url,
+      preview_images: cur.preview_images,
+      price_points: f.price_points.value,
+      app_html: f.app_html.value,
     };
     if (isAdmin()) { body.status = f.status.value; body.trending = f.trending.checked; }
     const saved = await api('/api/studio/items', { method: 'POST', body });
@@ -294,6 +311,23 @@
     await loadList();
     await showEditor(null);
   });
+
+  // ===== 売上・配布 =====
+  async function loadFinance(itemId) {
+    const { sales, grant } = await api(`/api/studio/items/${encodeURIComponent(itemId)}/finance`);
+    const grantLine = grant?.active
+      ? `配布：${pt(grant.usedPoints)} / ${pt(grant.maxPoints)}（1回 ${pt(grant.perCallMax)}${grant.perUserMinuteMax ? `・1人1分 ${pt(grant.perUserMinuteMax)}` : ''}）`
+      : '配布：なし（管理者が設定すると、アプリからポイントを配れます）';
+    $('#finance').innerHTML = `
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div class="border rounded-xl p-3"><div class="text-xs text-gray-500">受け取った売上</div><div class="text-lg font-semibold">${pt(sales.paid)}</div></div>
+        <div class="border rounded-xl p-3"><div class="text-xs text-gray-500">支払い待ち</div><div class="text-lg font-semibold">${pt(sales.pending)}</div></div>
+        <div class="border rounded-xl p-3"><div class="text-xs text-gray-500">取引の件数</div><div class="text-lg font-semibold">${sales.count.toLocaleString('ja-JP')} 件</div></div>
+      </div>
+      <p class="text-xs text-gray-600">${esc(grantLine)}</p>
+      <p class="text-[11px] text-gray-500">支払い待ちは、仙人アカウントと連携すると自動で受け取れます。</p>
+      <ul class="divide-y text-xs">${sales.recent.map(s => `<li class="py-1.5 flex justify-between"><span>${new Date(s.created_at).toLocaleString('ja-JP')}</span><span>${pt(s.amount)} · ${s.status === 'paid' ? '受取済み' : s.status === 'failed' ? '失敗' : '待ち'}</span></li>`).join('') || '<li class="py-2 text-gray-400">取引はまだありません</li>'}</ul>`;
+  }
 
   // ===== レビュー =====
   async function loadReviews(itemId) {
@@ -328,38 +362,62 @@
     alert('返信を保存しました');
   }));
 
-  // ===== アプリ内課金 =====
-  async function loadIap(itemId) {
-    const list = await api(`/api/studio/items/${encodeURIComponent(itemId)}/iap`);
-    $('#iapList').innerHTML = list.map(p => `
-      <li class="py-2 flex justify-between gap-2">
-        <span><b class="font-mono">${esc(p.sku)}</b> ${esc(p.name)} · ${Number(p.price_points).toLocaleString()} pt ${p.consumable ? '（消費型）' : '（買い切り）'}</span>
-        <button type="button" data-del-iap="${esc(p.sku)}" class="text-red-600 text-xs shrink-0">削除</button>
-      </li>`).join('') || '<li class="text-gray-400 py-2">アプリ内課金はありません</li>';
+  // ===== 管理者：配布の上限 =====
+  async function loadAdmin() {
+    const options = items.map(i => `<option value="${esc(i.id)}">${esc(i.title)}</option>`).join('');
+    $('#codeItem').innerHTML = options;
+    grants = await api('/api/admin/grants');
+    $('#grantItem').innerHTML = grants.map(g => `<option value="${esc(g.item_id)}">${esc(g.title)}</option>`).join('');
+    $('#grantItem').dispatchEvent(new Event('change'));
+    $('#grantList').innerHTML = grants.map(g => `
+      <li class="py-1.5 flex justify-between gap-2">
+        <span>${esc(g.title)}</span>
+        <span>${g.active ? '配布中' : '停止'} · ${pt(g.used_points)} / ${pt(g.max_points)} · 1回 ${pt(g.per_call_max)}</span>
+      </li>`).join('') || '<li class="text-gray-400 py-2">アプリはありません</li>';
+    await loadCodes();
   }
 
-  $('#iapForm').addEventListener('submit', safe(async (e) => {
+  $('#grantItem').addEventListener('change', () => {
+    const g = grants.find(x => x.item_id === $('#grantItem').value);
+    const f = $('#grantForm').elements;
+    f.max_points.value = g?.max_points ?? 0;
+    f.per_call_max.value = g?.per_call_max ?? 500;
+    f.per_user_minute_max.value = g?.per_user_minute_max ?? 0;
+    f.active.checked = !!g?.active;
+    $('#grantInfo').textContent = g ? `現在 ${pt(g.used_points)} 配布済み。上限はこれより少なくできません。` : '';
+  });
+
+  $('#grantForm').addEventListener('submit', safe(async (e) => {
     e.preventDefault();
-    if (!cur?.id) throw new Error('先に作品を保存してください');
     const f = e.target.elements;
-    await api('/api/studio/iap', {
-      method: 'POST',
-      body: { item_id: cur.id, sku: f.sku.value.trim(), name: f.name.value.trim(), price_points: Number(f.price_points.value), consumable: f.consumable.checked },
+    const itemId = f.item_id.value;
+    await api(`/api/admin/grants/${encodeURIComponent(itemId)}`, {
+      method: 'PUT',
+      body: {
+        max_points: Number(f.max_points.value),
+        per_call_max: Number(f.per_call_max.value),
+        per_user_minute_max: Number(f.per_user_minute_max.value || 0),
+        active: f.active.checked,
+      },
     });
-    e.target.reset();
-    await loadIap(cur.id);
+    grants = await api('/api/admin/grants');
+    const keep = itemId;
+    $('#grantItem').value = keep;
+    $('#grantItem').dispatchEvent(new Event('change'));
+    alert('配布の設定を保存しました');
   }));
 
-  $('#iapList').addEventListener('click', safe(async (e) => {
-    const sku = e.target.dataset.delIap;
-    if (!sku || !confirm('このアプリ内課金を削除しますか？')) return;
-    await api(`/api/studio/iap/${encodeURIComponent(sku)}`, { method: 'DELETE' });
-    await loadIap(cur.id);
+  $('#certForm').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const f = e.target.elements;
+    await api(`/api/admin/creators/${encodeURIComponent(f.sub.value.trim())}`, {
+      method: 'PUT', body: { certified: f.certified.checked },
+    });
+    alert('認定の設定を保存しました');
   }));
 
-  // ===== 管理者 =====
+  // ===== 管理者：引き換えコード・権限 =====
   async function loadCodes() {
-    $('#codeItem').innerHTML = items.map(i => `<option value="${esc(i.id)}">${esc(i.title)}</option>`).join('');
     const codes = await api('/api/admin/codes');
     $('#codeList').innerHTML = codes.map(c => `
       <li class="py-2 flex justify-between gap-2">
