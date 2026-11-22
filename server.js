@@ -12,6 +12,8 @@ import { makeCipher } from './lib/crypto.js';
 // ===== 設定 =====
 const env = process.env;
 const SENNIN_BASE = (env.SENNIN_BASE || 'https://sennin-account-api.xianrendesu.workers.dev').replace(/\/$/, '');
+// 認証画面（ログイン画面）のURL。Apps Script など、API と別の場所にある場合は SENNIN_AUTHORIZE_URL で指定する
+const AUTHORIZE_URL = env.SENNIN_AUTHORIZE_URL || `${SENNIN_BASE}/oauth/authorize`;
 const CLIENT_ID = env.SENNIN_CLIENT_ID;
 const CLIENT_SECRET = env.SENNIN_CLIENT_SECRET;
 const PUBLIC_URL = (env.PUBLIC_URL || '').replace(/\/$/, '');
@@ -42,7 +44,6 @@ const cipher = makeCipher(env.TOKEN_ENCRYPTION_KEY);
 const app = express();
 app.use(express.json({ limit: '3mb' }));
 app.use(express.static(path.join(process.cwd(), 'public')));
-app.get('/admin.html', (_req, res) => res.redirect('/studio.html'));
 
 const sb = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const turso = createTurso({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN });
@@ -415,11 +416,13 @@ app.get('/auth/login', (req, res) => {
   const verifier = b64u(crypto.randomBytes(48));
   const state = b64u(crypto.randomBytes(16));
   setCookie(res, COOKIE_TX, signPack({ state, verifier, next: safeNext(req.query.next), exp: Date.now() + 600_000 }), 600);
-  const u = new URL('/oauth/authorize', SENNIN_BASE);
-  u.search = new URLSearchParams({
+  const u = new URL(AUTHORIZE_URL);
+  const params = {
     response_type: 'code', client_id: CLIENT_ID, redirect_uri: REDIRECT_URI, scope: SCOPES,
     state, code_challenge: b64u(sha256(verifier)), code_challenge_method: 'S256',
-  }).toString();
+  };
+  // 既存のクエリ（Apps Script の ?… など）を残したまま、認証のパラメータを足す
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   res.redirect(u.toString());
 });
 
@@ -963,6 +966,42 @@ app.put('/api/admin/grants/:id', user('admin'), async (req, res) => {
   }, { onConflict: 'item_id' });
   if (error) return res.status(400).json({ error: error.message });
   res.json({ ok: true, used_points: used });
+});
+
+// 審査待ち・公開中などの一覧（管理者ページ用）。公開に必要な項目が揃っているかも返す
+app.get('/api/admin/items', user('admin'), async (_req, res) => {
+  const { data: items, error } = await sb.from('items')
+    .select('id, title, owner_sub, status, price_points, icon_url, preview_images, updated_at')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  const { data: srcs } = await sb.from('app_sources').select('item_id');
+  const withApp = new Set((srcs || []).map((r) => r.item_id));
+  res.json((items || []).map((i) => ({
+    id: i.id, title: i.title, owner_sub: i.owner_sub, status: i.status, price_points: i.price_points,
+    updated_at: i.updated_at,
+    ready: {
+      icon: Boolean(i.icon_url), image: Boolean((i.preview_images || []).length), html: withApp.has(i.id),
+    },
+  })));
+});
+
+// 状態を変える（公開・停止・審査中に戻す）。公開には、アイコン・画像・HTML が必要
+app.post('/api/admin/items/:id/status', user('admin'), async (req, res) => {
+  const status = String((req.body || {}).status || '');
+  if (!STATUSES.includes(status)) return res.status(400).json({ error: '状態が不正です' });
+  const item = await loadItem(req.params.id);
+  if (!item) return res.status(404).json({ error: 'アプリが見つかりません' });
+  if (status === 'published') {
+    const { data: src } = await sb.from('app_sources').select('item_id').eq('item_id', item.id).maybeSingle();
+    const missing = [];
+    if (!item.icon_url) missing.push('アイコン');
+    if (!(item.preview_images || []).length) missing.push('アプリ画像');
+    if (!src) missing.push('HTML');
+    if (missing.length) return res.status(400).json({ error: `公開するには ${missing.join('・')} が必要です` });
+  }
+  const { error } = await sb.from('items').update({ status, updated_at: new Date().toISOString() }).eq('id', item.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ ok: true, status });
 });
 
 // 認定開発者（1回に払わせられる上限が上がる）

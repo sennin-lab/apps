@@ -64,13 +64,6 @@
           <summary class="cursor-pointer font-medium">詳細設定（任意）</summary>
           <div class="grid sm:grid-cols-2 gap-3 mt-3">
             <label>販売価格（仙人ポイント・0で無料）<input name="price_points" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg px-3 py-2"></label>
-            <label class="admin-only hidden">状態
-              <select name="status" class="mt-1 w-full border rounded-lg px-3 py-2">
-                <option value="draft">下書き</option><option value="in_review">審査中</option>
-                <option value="published">公開</option><option value="suspended">停止</option>
-              </select>
-            </label>
-            <label class="admin-only hidden flex items-center gap-2"><input type="checkbox" name="trending"> トレンドに表示</label>
           </div>
         </details>
 
@@ -104,57 +97,6 @@ await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
       </section>
     </section>
 
-    <section id="adminBox" class="hidden bg-white rounded-2xl p-5 shadow space-y-6">
-      <h2 class="font-semibold">管理者</h2>
-
-      <div class="space-y-2">
-        <h3 class="font-medium">ポイント配布の上限</h3>
-        <form id="grantForm" class="grid sm:grid-cols-6 gap-2 items-end text-sm">
-          <label class="sm:col-span-2">アプリ<select name="item_id" id="grantItem" class="w-full border rounded-lg px-2 py-1.5"></select></label>
-          <label>合計の上限(pt)<input name="max_points" type="number" min="0" required class="w-full border rounded-lg px-2 py-1.5"></label>
-          <label>1回の上限(pt)<input name="per_call_max" type="number" min="1" value="500" required class="w-full border rounded-lg px-2 py-1.5"></label>
-          <label>1人1分の上限(pt)<input name="per_user_minute_max" type="number" min="0" value="0" class="w-full border rounded-lg px-2 py-1.5"></label>
-          <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="active"> 配布する</label>
-          <p id="grantInfo" class="sm:col-span-6 text-xs text-gray-500"></p>
-          <button class="sm:col-span-6 justify-self-end bg-blue-600 text-white px-4 py-2 rounded-full">保存</button>
-        </form>
-        <ul id="grantList" class="divide-y text-xs"></ul>
-      </div>
-
-      <div class="space-y-2">
-        <h3 class="font-medium">認定開発者</h3>
-        <form id="certForm" class="flex flex-wrap gap-2 items-end text-sm">
-          <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
-          <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="certified" checked> 認定する</label>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
-        </form>
-      </div>
-
-      <div class="space-y-2">
-        <h3 class="font-medium">権限</h3>
-        <form id="roleForm" class="flex flex-wrap gap-2 items-end text-sm">
-          <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
-          <label>権限
-            <select name="role" class="border rounded-lg px-2 py-1.5">
-              <option value="developer">開発者</option><option value="user">一般</option>
-            </select>
-          </label>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
-        </form>
-      </div>
-
-      <div class="space-y-2">
-        <h3 class="font-medium">引き換えコード</h3>
-        <form id="codeForm" class="flex flex-wrap gap-2 items-end text-sm">
-          <label>アプリ<select name="item_id" id="codeItem" class="border rounded-lg px-2 py-1.5"></select></label>
-          <label>コード（空欄で自動）<input name="code" class="border rounded-lg px-2 py-1.5 uppercase"></label>
-          <label>使用上限<input name="max_uses" type="number" value="1" min="1" class="border rounded-lg px-2 py-1.5 w-24"></label>
-          <label>期限<input name="expires_at" type="datetime-local" class="border rounded-lg px-2 py-1.5"></label>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded-full">発行</button>
-        </form>
-        <ul id="codeList" class="divide-y text-sm"></ul>
-      </div>
-    </section>
   </div>
 </main>
 
@@ -165,7 +107,6 @@ await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
   const pt = (n) => `${Number(n || 0).toLocaleString('ja-JP')} pt`;
   const STATUS_LABEL = { draft: '下書き', in_review: '審査中', published: '公開中', suspended: '停止中' };
   let me = null, items = [], cur = null, grants = [];
-  const isAdmin = () => me?.role === 'admin';
 
   async function api(path, { method = 'GET', body, form } = {}) {
     const opts = { method, credentials: 'same-origin', headers: {} };
@@ -200,10 +141,7 @@ await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
     }
 
     $('#app').classList.remove('hidden');
-    document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
-    if (isAdmin()) { $('#adminBox').classList.remove('hidden'); }
     await loadList();
-    if (isAdmin()) await loadAdmin();
     await showEditor(null);
   }
 
@@ -289,7 +227,6 @@ await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
       price_points: f.price_points.value,
       app_html: f.app_html.value,
     };
-    if (isAdmin()) { body.status = f.status.value; body.trending = f.trending.checked; }
     const saved = await api('/api/studio/items', { method: 'POST', body });
     await loadList();
     await showEditor(items.find(i => i.id === saved.id));
@@ -360,96 +297,6 @@ await senninapp.award(20, '毎日ログイン', 'daily-2026-11-22-user1');</pre>
       method: 'PUT', body: { reply: e.target.elements.reply.value },
     });
     alert('返信を保存しました');
-  }));
-
-  // ===== 管理者：配布の上限 =====
-  async function loadAdmin() {
-    const options = items.map(i => `<option value="${esc(i.id)}">${esc(i.title)}</option>`).join('');
-    $('#codeItem').innerHTML = options;
-    grants = await api('/api/admin/grants');
-    $('#grantItem').innerHTML = grants.map(g => `<option value="${esc(g.item_id)}">${esc(g.title)}</option>`).join('');
-    $('#grantItem').dispatchEvent(new Event('change'));
-    $('#grantList').innerHTML = grants.map(g => `
-      <li class="py-1.5 flex justify-between gap-2">
-        <span>${esc(g.title)}</span>
-        <span>${g.active ? '配布中' : '停止'} · ${pt(g.used_points)} / ${pt(g.max_points)} · 1回 ${pt(g.per_call_max)}</span>
-      </li>`).join('') || '<li class="text-gray-400 py-2">アプリはありません</li>';
-    await loadCodes();
-  }
-
-  $('#grantItem').addEventListener('change', () => {
-    const g = grants.find(x => x.item_id === $('#grantItem').value);
-    const f = $('#grantForm').elements;
-    f.max_points.value = g?.max_points ?? 0;
-    f.per_call_max.value = g?.per_call_max ?? 500;
-    f.per_user_minute_max.value = g?.per_user_minute_max ?? 0;
-    f.active.checked = !!g?.active;
-    $('#grantInfo').textContent = g ? `現在 ${pt(g.used_points)} 配布済み。上限はこれより少なくできません。` : '';
-  });
-
-  $('#grantForm').addEventListener('submit', safe(async (e) => {
-    e.preventDefault();
-    const f = e.target.elements;
-    const itemId = f.item_id.value;
-    await api(`/api/admin/grants/${encodeURIComponent(itemId)}`, {
-      method: 'PUT',
-      body: {
-        max_points: Number(f.max_points.value),
-        per_call_max: Number(f.per_call_max.value),
-        per_user_minute_max: Number(f.per_user_minute_max.value || 0),
-        active: f.active.checked,
-      },
-    });
-    grants = await api('/api/admin/grants');
-    const keep = itemId;
-    $('#grantItem').value = keep;
-    $('#grantItem').dispatchEvent(new Event('change'));
-    alert('配布の設定を保存しました');
-  }));
-
-  $('#certForm').addEventListener('submit', safe(async (e) => {
-    e.preventDefault();
-    const f = e.target.elements;
-    await api(`/api/admin/creators/${encodeURIComponent(f.sub.value.trim())}`, {
-      method: 'PUT', body: { certified: f.certified.checked },
-    });
-    alert('認定の設定を保存しました');
-  }));
-
-  // ===== 管理者：引き換えコード・権限 =====
-  async function loadCodes() {
-    const codes = await api('/api/admin/codes');
-    $('#codeList').innerHTML = codes.map(c => `
-      <li class="py-2 flex justify-between gap-2">
-        <span><b class="font-mono">${esc(c.code)}</b> → ${esc(c.item_id)}（${c.used_count}/${c.max_uses}）${c.expires_at ? ' 期限 ' + new Date(c.expires_at).toLocaleString('ja-JP') : ''}</span>
-        <button type="button" data-del-code="${esc(c.code)}" class="text-red-600 text-xs">削除</button>
-      </li>`).join('') || '<li class="text-gray-400 py-2">コードはありません</li>';
-  }
-
-  $('#codeForm').addEventListener('submit', safe(async (e) => {
-    e.preventDefault();
-    const f = e.target.elements;
-    const exp = f.expires_at.value;
-    await api('/api/admin/codes', {
-      method: 'POST',
-      body: { item_id: f.item_id.value, code: f.code.value || undefined, max_uses: Number(f.max_uses.value) || 1, expires_at: exp ? new Date(exp).toISOString() : null },
-    });
-    f.code.value = '';
-    await loadCodes();
-  }));
-
-  $('#codeList').addEventListener('click', safe(async (e) => {
-    const c = e.target.dataset.delCode;
-    if (!c) return;
-    await api(`/api/admin/codes/${encodeURIComponent(c)}`, { method: 'DELETE' });
-    await loadCodes();
-  }));
-
-  $('#roleForm').addEventListener('submit', safe(async (e) => {
-    e.preventDefault();
-    const f = e.target.elements;
-    await api('/api/admin/accounts/role', { method: 'POST', body: { sub: f.sub.value.trim(), role: f.role.value } });
-    alert('権限を設定しました');
   }));
 
   boot().catch(err => alert(err.message));
