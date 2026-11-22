@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>senninstudio for apps</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] font-sans min-h-screen">
+
+<header class="bg-white/90 backdrop-blur border-b border-black/5 px-5 py-3 flex items-center justify-between sticky top-0 z-10">
+  <div class="font-semibold">senninstudio <span class="font-normal text-gray-500">for apps</span></div>
+  <div id="whoami" class="text-sm flex items-center gap-3"></div>
+</header>
+
+<section id="gate" class="hidden max-w-md mx-auto mt-16 bg-white rounded-2xl p-6 shadow space-y-4"></section>
+
+<main id="app" class="hidden max-w-6xl mx-auto p-4 grid lg:grid-cols-[260px_1fr] gap-4">
+  <aside class="bg-white rounded-2xl p-4 shadow space-y-3 h-fit">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold">作品</h2>
+      <button id="newBtn" type="button" class="text-sm px-3 py-1.5 rounded-full bg-blue-600 text-white">＋ 新規</button>
+    </div>
+    <ul id="list" class="divide-y text-sm max-h-[70vh] overflow-y-auto"></ul>
+  </aside>
+
+  <div class="space-y-4 min-w-0">
+    <section class="bg-white rounded-2xl p-5 shadow">
+      <div class="flex items-center justify-between mb-3 gap-3">
+        <h2 id="editTitle" class="font-semibold text-lg truncate">作品の編集</h2>
+        <span id="statusBadge" class="text-xs px-2.5 py-1 rounded-full bg-gray-100 whitespace-nowrap"></span>
+      </div>
+      <form id="form" class="grid sm:grid-cols-2 gap-3 text-sm">
+        <label>ID（英小文字・数字・-）<input name="id" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>種類
+          <select name="type" class="w-full border rounded-lg px-2.5 py-1.5">
+            <option value="app">アプリ</option><option value="game">ゲーム</option><option value="product">商品</option>
+          </select>
+        </label>
+        <label class="sm:col-span-2">タイトル<input name="title" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label class="sm:col-span-2">サブタイトル<input name="subtitle" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label class="sm:col-span-2">説明<textarea name="description" rows="3" class="w-full border rounded-lg px-2.5 py-1.5"></textarea></label>
+        <label>カテゴリ<input name="category_label" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>開発元<input name="developer" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>サイズ<input name="size" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>年齢/認証<input name="age_rating" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>価格（仙人ポイント・0で無料）<input name="price_points" type="number" min="0" value="0" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>価格の補足<input name="sub_price_note" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>バッジ<input name="featured_badge" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label>起動方法
+          <select name="open_mode" class="w-full border rounded-lg px-2.5 py-1.5">
+            <option value="iframe">ホーム内で表示</option><option value="new_tab">別タブで開く</option>
+          </select>
+        </label>
+        <label class="sm:col-span-2">ハイライト（カンマ区切り）<input name="highlights" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+        <label class="sm:col-span-2">起動URL（https://）<input name="launch_url" class="w-full border rounded-lg px-2.5 py-1.5"></label>
+
+        <div class="sm:col-span-2 grid sm:grid-cols-2 gap-3 pt-3 border-t">
+          <div>
+            <div class="font-medium mb-1">サムネイル（ストアのカード用）</div>
+            <div id="thumbPreview" class="mb-2"></div>
+            <input type="file" id="thumbFile" accept="image/*" class="text-xs">
+          </div>
+          <div>
+            <div class="font-medium mb-1">アイコン</div>
+            <div id="iconPreview" class="mb-2"></div>
+            <input type="file" id="iconFile" accept="image/*" class="text-xs">
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <div class="font-medium mb-1">作品の画像（プレビュー）</div>
+          <div id="previewList" class="grid grid-cols-3 gap-2 mb-2"></div>
+          <input type="file" id="previewFiles" accept="image/*" multiple class="text-xs">
+          <p class="text-[11px] text-gray-500 mt-1">jpg / png / webp、1枚2MB以下。アップロードは即時、反映は「保存」で確定します。</p>
+        </div>
+
+        <div class="sm:col-span-2 flex flex-wrap items-center gap-2 pt-3 border-t">
+          <label class="admin-only hidden items-center gap-1">状態
+            <select name="status" class="border rounded-lg px-2 py-1.5">
+              <option value="draft">下書き</option><option value="in_review">審査中</option>
+              <option value="published">公開</option><option value="suspended">停止</option>
+            </select>
+          </label>
+          <label class="admin-only hidden items-center gap-1"><input type="checkbox" name="trending"> トレンドに表示</label>
+          <span class="flex-1"></span>
+          <button type="button" id="deleteBtn" class="text-red-600 text-sm px-3 py-1.5">削除</button>
+          <button type="button" id="submitBtn" class="text-sm px-4 py-2 rounded-full bg-gray-100">審査に出す</button>
+          <button class="text-sm px-5 py-2 rounded-full bg-blue-600 text-white font-semibold">保存</button>
+          <p id="saveMsg" class="w-full text-sm text-green-700"></p>
+        </div>
+      </form>
+    </section>
+
+    <section class="bg-white rounded-2xl p-5 shadow">
+      <h2 class="font-semibold mb-3">レビュー</h2>
+      <ul id="reviewList" class="space-y-3 text-sm"></ul>
+    </section>
+
+    <section class="bg-white rounded-2xl p-5 shadow">
+      <h2 class="font-semibold mb-3">アプリ内課金（仙人ポイント）</h2>
+      <ul id="iapList" class="divide-y text-sm mb-3"></ul>
+      <form id="iapForm" class="grid sm:grid-cols-5 gap-2 text-sm items-end">
+        <label>SKU<input name="sku" required pattern="[A-Za-z0-9_.:\-]{3,64}" class="w-full border rounded-lg px-2 py-1.5"></label>
+        <label class="sm:col-span-2">名称<input name="name" required class="w-full border rounded-lg px-2 py-1.5"></label>
+        <label>価格pt<input name="price_points" type="number" min="1" required class="w-full border rounded-lg px-2 py-1.5"></label>
+        <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="consumable" checked> 消費型</label>
+        <button class="sm:col-span-5 justify-self-end bg-blue-600 text-white px-4 py-2 rounded-full">追加</button>
+      </form>
+    </section>
+
+    <section id="adminBox" class="hidden bg-white rounded-2xl p-5 shadow space-y-4">
+      <h2 class="font-semibold">管理者</h2>
+      <form id="roleForm" class="flex flex-wrap gap-2 items-end text-sm">
+        <label>ユーザーID（sub）<input name="sub" required class="border rounded-lg px-2 py-1.5 w-80"></label>
+        <label>権限
+          <select name="role" class="border rounded-lg px-2 py-1.5">
+            <option value="developer">開発者</option><option value="user">一般</option>
+          </select>
+        </label>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded-full">設定</button>
+      </form>
+      <h3 class="font-medium">引き換えコード</h3>
+      <form id="codeForm" class="flex flex-wrap gap-2 items-end text-sm">
+        <label>作品<select name="item_id" id="codeItem" class="border rounded-lg px-2 py-1.5"></select></label>
+        <label>コード（空欄で自動）<input name="code" class="border rounded-lg px-2 py-1.5 uppercase"></label>
+        <label>使用上限<input name="max_uses" type="number" value="1" min="1" class="border rounded-lg px-2 py-1.5 w-24"></label>
+        <label>期限<input name="expires_at" type="datetime-local" class="border rounded-lg px-2 py-1.5"></label>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded-full">発行</button>
+      </form>
+      <ul id="codeList" class="divide-y text-sm"></ul>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const safe = (fn) => async (...args) => { try { await fn(...args); } catch (err) { alert(err.message); } };
+  const STATUS_LABEL = { draft: '下書き', in_review: '審査中', published: '公開中', suspended: '停止中' };
+  let me = null, items = [], cur = null;
+  const isAdmin = () => me?.role === 'admin';
+
+  async function api(path, { method = 'GET', body, form } = {}) {
+    const opts = { method, credentials: 'same-origin', headers: {} };
+    if (form) opts.body = form;
+    else if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const r = await fetch(path, opts);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
+  async function boot() {
+    ({ me } = await api('/api/me'));
+    if (!me) {
+      $('#gate').classList.remove('hidden');
+      $('#gate').innerHTML = `<h1 class="text-xl font-semibold">senninstudio for apps</h1>
+        <p class="text-sm text-gray-600">作品の公開・サムネイル・画像・レビューの管理は、仙人アカウントでログインして行います。</p>
+        <a href="/auth/login?next=${encodeURIComponent('/studio.html')}" class="block text-center bg-blue-600 text-white rounded-lg py-2 font-semibold">仙人アカウントでログイン</a>`;
+      return;
+    }
+    $('#whoami').innerHTML = `<span>${esc(me.name || 'ユーザー')}</span>
+      <span class="text-gray-500">${me.points == null ? '' : Number(me.points).toLocaleString() + ' pt'}</span>
+      <code class="text-[11px] text-gray-400 hidden sm:inline">${esc(me.sub)}</code>
+      <form method="post" action="/auth/logout"><button class="text-gray-500 underline">ログアウト</button></form>`;
+
+    if (!['developer', 'admin'].includes(me.role)) {
+      $('#gate').classList.remove('hidden');
+      $('#gate').innerHTML = `<h1 class="text-xl font-semibold">開発者権限が必要です</h1>
+        <p class="text-sm text-gray-600">管理者にこのIDを伝えて、開発者として登録してもらってください。</p>
+        <code class="block break-all bg-gray-100 rounded-lg p-3 text-sm">${esc(me.sub)}</code>`;
+      return;
+    }
+
+    $('#app').classList.remove('hidden');
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+    if (isAdmin()) $('#adminBox').classList.remove('hidden');
+    await loadList();
+    if (isAdmin()) await loadCodes();
+    await showEditor(null);
+  }
+
+  async function loadList() {
+    items = await api('/api/studio/items');
+    $('#list').innerHTML = items.map(i => `
+      <li><button type="button" data-id="${esc(i.id)}" class="w-full text-left py-2 ${cur && cur.id === i.id ? 'text-blue-600 font-semibold' : ''}">
+        <div>${esc(i.title)}</div>
+        <div class="text-xs text-gray-500">${STATUS_LABEL[i.status] || esc(i.status)} · ${i.price_points ? Number(i.price_points).toLocaleString() + ' pt' : '無料'} · ★${Number(i.rating).toFixed(1)}</div>
+      </button></li>`).join('') || '<li class="py-3 text-gray-400">作品はまだありません</li>';
+  }
+
+  $('#list').addEventListener('click', (e) => {
+    const id = e.target.closest('[data-id]')?.dataset.id;
+    if (id) showEditor(items.find(i => i.id === id)).catch(err => alert(err.message));
+  });
+  $('#newBtn').onclick = () => showEditor(null).catch(err => alert(err.message));
+
+  async function showEditor(item) {
+    cur = item ? { ...item } : { preview_images: [], icon_url: null, thumbnail_url: null };
+    const f = $('#form');
+    f.reset();
+    if (item) for (const [k, v] of Object.entries(item)) {
+      const el = f.elements[k];
+      if (!el) continue;
+      if (el.type === 'checkbox') el.checked = !!v;
+      else el.value = Array.isArray(v) ? v.join(', ') : (v ?? '');
+    }
+    f.elements.id.readOnly = !!item;
+    $('#editTitle').textContent = item ? `作品の編集：${item.title}` : '新しい作品';
+    $('#statusBadge').textContent = item ? (STATUS_LABEL[item.status] || item.status) : '未保存';
+    $('#deleteBtn').classList.toggle('invisible', !item);
+    $('#submitBtn').classList.toggle('invisible', !item);
+    $('#saveMsg').textContent = '';
+    renderImages();
+    if (item) {
+      await Promise.all([loadReviews(item.id), loadIap(item.id)]);
+    } else {
+      $('#reviewList').innerHTML = '<li class="text-gray-400">作品を保存すると表示されます</li>';
+      $('#iapList').innerHTML = '<li class="text-gray-400 py-2">作品を保存すると設定できます</li>';
+    }
+  }
+
+  // ===== 画像 =====
+  function renderImages() {
+    const slot = (url, clear) => url
+      ? `<div class="relative inline-block"><img src="${esc(url)}" class="w-24 h-24 object-cover rounded-xl"><button type="button" data-clear="${clear}" class="absolute -top-2 -right-2 bg-white shadow rounded-full w-6 h-6 text-xs">✕</button></div>`
+      : '<div class="w-24 h-24 rounded-xl bg-gray-100 flex items-center justify-center text-xs text-gray-400">未設定</div>';
+    $('#thumbPreview').innerHTML = slot(cur.thumbnail_url, 'thumbnail_url');
+    $('#iconPreview').innerHTML = slot(cur.icon_url, 'icon_url');
+    $('#previewList').innerHTML = cur.preview_images.map((u, i) => `
+      <div class="relative"><img src="${esc(u)}" class="w-full h-28 object-cover rounded-xl">
+        <button type="button" data-pidx="${i}" class="absolute top-1 right-1 bg-white shadow rounded-full w-6 h-6 text-xs">✕</button></div>`).join('');
+  }
+
+  async function uploadFile(file) {
+    const fd = new FormData();
+    fd.append('image', file);
+    return (await api('/api/studio/images', { method: 'POST', form: fd })).url;
+  }
+
+  $('#form').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-clear]');
+    if (c) { cur[c.dataset.clear] = null; return renderImages(); }
+    const p = e.target.closest('[data-pidx]');
+    if (p) { cur.preview_images.splice(Number(p.dataset.pidx), 1); renderImages(); }
+  });
+  $('#thumbFile').onchange = safe(async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    cur.thumbnail_url = await uploadFile(file); renderImages();
+  });
+  $('#iconFile').onchange = safe(async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    cur.icon_url = await uploadFile(file); renderImages();
+  });
+  $('#previewFiles').onchange = safe(async (e) => {
+    const files = [...e.target.files]; e.target.value = '';
+    for (const file of files) cur.preview_images.push(await uploadFile(file));
+    renderImages();
+  });
+
+  // ===== 保存・審査・削除 =====
+  $('#form').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const body = {
+      id: f.id.value.trim(), type: f.type.value, title: f.title.value, subtitle: f.subtitle.value,
+      description: f.description.value, category_label: f.category_label.value, developer: f.developer.value,
+      size: f.size.value, age_rating: f.age_rating.value, price_points: f.price_points.value,
+      sub_price_note: f.sub_price_note.value, featured_badge: f.featured_badge.value,
+      open_mode: f.open_mode.value, highlights: f.highlights.value, launch_url: f.launch_url.value,
+      icon_url: cur.icon_url, thumbnail_url: cur.thumbnail_url, preview_images: cur.preview_images,
+    };
+    if (isAdmin()) { body.status = f.status.value; body.trending = f.trending.checked; }
+    const saved = await api('/api/studio/items', { method: 'POST', body });
+    await loadList();
+    await showEditor(items.find(i => i.id === saved.id));
+    $('#saveMsg').textContent = '保存しました';
+  }));
+
+  $('#submitBtn').onclick = safe(async () => {
+    const id = cur?.id;
+    if (!id) return;
+    await api(`/api/studio/items/${encodeURIComponent(id)}/submit`, { method: 'POST' });
+    await loadList();
+    await showEditor(items.find(i => i.id === id));
+    alert('審査に出しました。管理者が公開すると、ストアに表示されます。');
+  });
+
+  $('#deleteBtn').onclick = safe(async () => {
+    if (!cur?.id || !confirm(`「${cur.title}」を削除しますか？`)) return;
+    await api(`/api/studio/items/${encodeURIComponent(cur.id)}`, { method: 'DELETE' });
+    await loadList();
+    await showEditor(null);
+  });
+
+  // ===== レビュー =====
+  async function loadReviews(itemId) {
+    const revs = await api(`/api/studio/items/${encodeURIComponent(itemId)}/reviews`);
+    $('#reviewList').innerHTML = revs.map(r => `
+      <li class="border rounded-xl p-3 space-y-2">
+        <div class="flex justify-between gap-2">
+          <span>★${r.rating} <b>${esc(r.title || '')}</b> <span class="text-gray-500">${esc(r.author_name || 'ユーザー')}</span></span>
+          <button type="button" data-del-rev="${esc(r.id)}" class="text-red-600 text-xs shrink-0">削除</button>
+        </div>
+        <p class="text-gray-700 whitespace-pre-line">${esc(r.body || '')}</p>
+        <form data-reply="${esc(r.id)}" class="flex gap-2">
+          <input name="reply" value="${esc(r.developer_reply || '')}" placeholder="開発者の返信" class="flex-1 border rounded-lg px-2 py-1">
+          <button class="text-blue-600 text-xs">返信を保存</button>
+        </form>
+      </li>`).join('') || '<li class="text-gray-400">レビューはまだありません</li>';
+  }
+
+  $('#reviewList').addEventListener('click', safe(async (e) => {
+    const id = e.target.dataset.delRev;
+    if (!id || !confirm('このレビューを削除しますか？')) return;
+    await api(`/api/studio/reviews/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await loadReviews(cur.id);
+  }));
+
+  $('#reviewList').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const id = e.target.dataset.reply;
+    await api(`/api/studio/reviews/${encodeURIComponent(id)}/reply`, {
+      method: 'PUT', body: { reply: e.target.elements.reply.value },
+    });
+    alert('返信を保存しました');
+  }));
+
+  // ===== アプリ内課金 =====
+  async function loadIap(itemId) {
+    const list = await api(`/api/studio/items/${encodeURIComponent(itemId)}/iap`);
+    $('#iapList').innerHTML = list.map(p => `
+      <li class="py-2 flex justify-between gap-2">
+        <span><b class="font-mono">${esc(p.sku)}</b> ${esc(p.name)} · ${Number(p.price_points).toLocaleString()} pt ${p.consumable ? '（消費型）' : '（買い切り）'}</span>
+        <button type="button" data-del-iap="${esc(p.sku)}" class="text-red-600 text-xs shrink-0">削除</button>
+      </li>`).join('') || '<li class="text-gray-400 py-2">アプリ内課金はありません</li>';
+  }
+
+  $('#iapForm').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    if (!cur?.id) throw new Error('先に作品を保存してください');
+    const f = e.target.elements;
+    await api('/api/studio/iap', {
+      method: 'POST',
+      body: { item_id: cur.id, sku: f.sku.value.trim(), name: f.name.value.trim(), price_points: Number(f.price_points.value), consumable: f.consumable.checked },
+    });
+    e.target.reset();
+    await loadIap(cur.id);
+  }));
+
+  $('#iapList').addEventListener('click', safe(async (e) => {
+    const sku = e.target.dataset.delIap;
+    if (!sku || !confirm('このアプリ内課金を削除しますか？')) return;
+    await api(`/api/studio/iap/${encodeURIComponent(sku)}`, { method: 'DELETE' });
+    await loadIap(cur.id);
+  }));
+
+  // ===== 管理者 =====
+  async function loadCodes() {
+    $('#codeItem').innerHTML = items.map(i => `<option value="${esc(i.id)}">${esc(i.title)}</option>`).join('');
+    const codes = await api('/api/admin/codes');
+    $('#codeList').innerHTML = codes.map(c => `
+      <li class="py-2 flex justify-between gap-2">
+        <span><b class="font-mono">${esc(c.code)}</b> → ${esc(c.item_id)}（${c.used_count}/${c.max_uses}）${c.expires_at ? ' 期限 ' + new Date(c.expires_at).toLocaleString('ja-JP') : ''}</span>
+        <button type="button" data-del-code="${esc(c.code)}" class="text-red-600 text-xs">削除</button>
+      </li>`).join('') || '<li class="text-gray-400 py-2">コードはありません</li>';
+  }
+
+  $('#codeForm').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const exp = f.expires_at.value;
+    await api('/api/admin/codes', {
+      method: 'POST',
+      body: { item_id: f.item_id.value, code: f.code.value || undefined, max_uses: Number(f.max_uses.value) || 1, expires_at: exp ? new Date(exp).toISOString() : null },
+    });
+    f.code.value = '';
+    await loadCodes();
+  }));
+
+  $('#codeList').addEventListener('click', safe(async (e) => {
+    const c = e.target.dataset.delCode;
+    if (!c) return;
+    await api(`/api/admin/codes/${encodeURIComponent(c)}`, { method: 'DELETE' });
+    await loadCodes();
+  }));
+
+  $('#roleForm').addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const f = e.target.elements;
+    await api('/api/admin/accounts/role', { method: 'POST', body: { sub: f.sub.value.trim(), role: f.role.value } });
+    alert('権限を設定しました');
+  }));
+
+  boot().catch(err => alert(err.message));
+</script>
+</body>
+</html>

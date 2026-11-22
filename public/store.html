@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>store</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -119,6 +118,8 @@
         </button>
       </div>
 
+      <div id="account-box" class="mb-5"></div>
+
       <nav class="space-y-2" aria-label="カテゴリ選択">
         <button data-filter="all" class="nav-filter-btn w-full flex items-center justify-between px-4 py-3 rounded-2xl text-left text-[16px] font-medium text-appleText bg-applePill/80 hover:bg-applePill transition">
           <span>すべて</span><span class="text-xs text-appleSecondary font-normal">Home</span>
@@ -168,59 +169,66 @@
   <div id="toast-notification" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-appleText/90 text-white text-xs font-medium shadow-lg backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 translate-y-3"></div>
 
   <script>
-    // ===== 1. データ層（Supabase） =====
+    // ===== 1. データ層（仙人アカウント + 自前API） =====
     let STORE_ITEMS = [];
-    let sb = null;
-    let currentUserId = null;
+    let ME = null;
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, {
+        method: opts.method || 'GET',
+        credentials: 'same-origin',
+        headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : {},
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      return j;
+    }
 
     function mapItem(r) {
+      const pts = Number(r.price_points || 0);
       return {
         id: r.id, type: r.type, title: r.title, subtitle: r.subtitle, description: r.description,
         categoryLabel: r.category_label, developer: r.developer, size: r.size, ageRating: r.age_rating,
-        priceText: r.price_text, subPriceNote: r.sub_price_note, trending: r.trending,
-        featuredBadge: r.featured_badge, highlights: r.highlights || [], previewGradients: r.preview_gradients || [],
+        priceText: pts === 0 ? '入手' : `${pts.toLocaleString()} pt`, pricePoints: pts,
+        subPriceNote: r.sub_price_note || (pts === 0 ? '無料' : '仙人ポイント'), trending: r.trending,
+        featuredBadge: r.featured_badge, highlights: r.highlights || [], previewGradients: [],
         gradient: r.gradient || 'from-neutral-800 to-neutral-900',
         iconBg: r.icon_bg || 'bg-gradient-to-br from-neutral-500 to-neutral-700',
-        iconUrl: r.icon_url, previewImages: r.preview_images || [],
+        iconUrl: r.thumbnail_url || r.icon_url, previewImages: r.preview_images || [],
         whatsNew: r.whats_new, rating: Number(r.rating), reviewsCount: r.reviews_count,
         launchUrl: r.launch_url, openMode: r.open_mode, reviewsList: []
       };
     }
 
     async function loadReviews(item) {
-      const { data } = await sb.from('reviews').select('*')
-        .eq('item_id', item.id).order('created_at', { ascending: false }).limit(50);
-      item.reviewsList = (data || []).map(r => ({
-        id: r.id, author: r.author || 'ゲストユーザー', rating: r.rating,
+      const data = await api(`/api/items/${encodeURIComponent(item.id)}/reviews`);
+      item.reviewsList = data.map(r => ({
+        id: r.id, author: r.author || 'ユーザー', rating: r.rating,
         date: new Date(r.created_at).toLocaleDateString('ja-JP'),
-        title: r.title || `${r.rating}つ星の評価`, body: r.body || ''
+        title: r.title || `${r.rating}つ星の評価`, body: r.body || '', reply: r.developer_reply || null
       }));
     }
 
-    async function refreshItem(itemId) {
-      const { data } = await sb.from('items').select('*').eq('id', itemId).single();
-      const i = STORE_ITEMS.findIndex(x => x.id === itemId);
-      if (data && i >= 0) STORE_ITEMS[i] = { ...mapItem(data), reviewsList: STORE_ITEMS[i].reviewsList };
+    async function refreshItems() {
+      const b = await api('/api/store/bootstrap');
+      const prev = Object.fromEntries(STORE_ITEMS.map(i => [i.id, i.reviewsList]));
+      STORE_ITEMS = b.items.map(mapItem);
+      STORE_ITEMS.forEach(i => { i.reviewsList = prev[i.id] || []; });
     }
 
     async function boot() {
-      const cfg = await fetch('/api/config').then(r => r.json());
-      sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-      const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) await sb.auth.signInAnonymously();
-      const { data: { user } } = await sb.auth.getUser();
-      currentUserId = user.id;
-
-      const [{ data: items, error }, { data: lib }] = await Promise.all([
-        sb.from('items').select('*').order('created_at'),
-        sb.from('library').select('item_id'),
-      ]);
-      if (error) return showToast('データの読み込みに失敗しました');
-      STORE_ITEMS = items.map(mapItem);
-      (lib || []).forEach(r => state.acquiredIds.add(r.item_id));
+      let b;
+      try { b = await api('/api/store/bootstrap'); }
+      catch (e) { return showToast('データの読み込みに失敗しました'); }
+      ME = b.me;
+      STORE_ITEMS = b.items.map(mapItem);
+      (b.library || []).forEach(id => state.acquiredIds.add(id));
+      renderAccountBox();
       await applyStateFromHash();
     }
 
+    // ===== 2. 状態管理 =====
     // ===== 2. 状態管理 =====
     const state = {
       view: 'store', currentFilter: 'all', searchQuery: '', selectedItemId: null,
@@ -341,7 +349,7 @@
     }
 
     function getButtonLabel(item) {
-      if (state.acquiredIds.has(item.id)) return item.type === 'product' ? 'カート済' : '開く';
+      if (state.acquiredIds.has(item.id)) return item.type === 'product' ? '購入済' : '開く';
       return item.priceText;
     }
 
@@ -564,7 +572,6 @@
                 </div>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input id="review-author-input" type="text" maxlength="30" placeholder="ニックネーム（任意）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
                 <input id="review-title-input" type="text" maxlength="50" placeholder="タイトル（例：とても使いやすい！）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
               </div>
               <textarea id="review-body-input" rows="3" maxlength="400" placeholder="感想を入力してください（評価のみでも送信できます）" class="w-full px-4 py-2.5 rounded-xl bg-white text-sm placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40 resize-none"></textarea>
@@ -585,6 +592,7 @@
                     <span class="text-[11px] text-appleSecondary">· ${escapeHtml(rev.author)}</span>
                   </div>
                   ${rev.body ? `<p class="text-xs sm:text-sm text-appleText/80 leading-relaxed">${escapeHtml(rev.body)}</p>` : ''}
+                  ${rev.reply ? `<div class="mt-3 pl-3 border-l-2 border-appleBlue/40 text-xs text-appleText/75"><span class="font-semibold">開発者の返信</span><p class="mt-1 leading-relaxed">${escapeHtml(rev.reply)}</p></div>` : ''}
                 </div>`).join('')}
             </div>
           </div>
@@ -637,18 +645,14 @@
 
       document.getElementById('review-submit-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const author = document.getElementById('review-author-input').value.trim() || 'ゲストユーザー';
+        if (!requireLogin()) return;
         const title = document.getElementById('review-title-input').value.trim();
         const body = document.getElementById('review-body-input').value.trim();
         const rating = state.selectedRatingInput;
-
-        const { error } = await sb.from('reviews').upsert(
-          { item_id: item.id, user_id: currentUserId, author, rating, title: title || null, body: body || null },
-          { onConflict: 'item_id,user_id' }
-        );
-        if (error) return showToast('送信に失敗しました');
-
-        await refreshItem(item.id);
+        try {
+          await api('/api/reviews', { method: 'POST', body: { item_id: item.id, rating, title, body } });
+        } catch (err) { return showToast(err.message); }
+        await refreshItems();
         const fresh = STORE_ITEMS.find(i => i.id === item.id);
         await loadReviews(fresh);
         state.selectedRatingInput = 5;
@@ -677,46 +681,72 @@
       });
     }
 
-    // ===== 5. 入手・起動・引き換え =====
+    // ===== 5. 入手・購入・起動・引き換え（仙人ポイント） =====
     function openItem(item) {
-      if (item.type === 'product') return showToast(`「${item.title}」はカートに入っています`);
+      if (item.type === 'product') return showToast('購入済みです');
       if (!item.launchUrl) return showToast(`「${item.title}」は起動先が未設定です`);
       if (item.openMode === 'new_tab') window.open(item.launchUrl, '_blank');
       else location.href = `/run.html?url=${encodeURIComponent(item.launchUrl)}&title=${encodeURIComponent(item.title)}`;
+    }
+
+    function requireLogin() {
+      if (ME) return true;
+      showToast('ログインしてください');
+      setTimeout(() => { location.href = `/auth/login?next=${encodeURIComponent(location.pathname + location.hash)}`; }, 700);
+      return false;
+    }
+
+    function renderAccountBox() {
+      const box = document.getElementById('account-box');
+      if (!box) return;
+      if (!ME) {
+        box.innerHTML = `<a href="/auth/login?next=${encodeURIComponent('/store.html')}" class="block w-full text-center px-4 py-2.5 rounded-2xl bg-appleBlue text-white text-sm font-semibold hover:bg-appleBlueHover transition">仙人アカウントでログイン</a>`;
+        return;
+      }
+      const studio = ['developer', 'admin'].includes(ME.role)
+        ? `<a href="/studio.html" class="block text-center text-xs text-appleBlue mt-2 hover:underline">senninstudio for apps を開く →</a>` : '';
+      box.innerHTML = `
+        <div class="px-4 py-3 rounded-2xl bg-applePill/80">
+          <div class="text-sm font-semibold truncate">${escapeHtml(ME.name || 'ユーザー')}</div>
+          <div class="text-xs text-appleSecondary mt-0.5">仙人ポイント <span class="font-semibold text-appleText">${ME.points == null ? '—' : Number(ME.points).toLocaleString() + ' pt'}</span></div>
+          <form method="post" action="/auth/logout" class="mt-2"><button class="text-xs text-appleSecondary hover:text-appleText">ログアウト</button></form>
+          ${studio}
+        </div>`;
     }
 
     async function handleAcquireAction(itemId, btnElement) {
       const item = STORE_ITEMS.find(i => i.id === itemId);
       if (!item) return;
       if (state.acquiredIds.has(itemId)) return openItem(item);
+      if (!requireLogin()) return;
+      if (item.pricePoints > 0 && !confirm(`「${item.title}」を ${item.pricePoints.toLocaleString()} pt で購入しますか？\n仙人ポイントから引き落とされます。`)) return;
 
+      const original = btnElement.innerHTML;
       btnElement.disabled = true;
       btnElement.innerHTML = `<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin-fast"></span>`;
-
-      const { error } = await sb.from('library').upsert(
-        { user_id: currentUserId, item_id: itemId },
-        { onConflict: 'user_id,item_id', ignoreDuplicates: true }
-      );
-      if (error) { btnElement.disabled = false; return showToast('追加に失敗しました'); }
-
-      state.acquiredIds.add(itemId);
-      renderApp();
-      showToast(item.type === 'product' ? `「${item.title}」をカートに追加しました` : `「${item.title}」を入手しました`);
+      try {
+        const r = await api('/api/purchase', { method: 'POST', body: { item_id: itemId } });
+        state.acquiredIds.add(itemId);
+        if (ME && r.points != null) ME.points = r.points;
+        renderAccountBox();
+        renderApp();
+        showToast(item.pricePoints > 0 ? `「${item.title}」を購入しました` : `「${item.title}」を入手しました`);
+      } catch (e) {
+        btnElement.disabled = false;
+        btnElement.innerHTML = original;
+        showToast(e.message);
+      }
     }
 
     async function redeemCode(code) {
       if (!code) return showToast('コードを入力してください');
-      const { data: { session } } = await sb.auth.getSession();
-      const r = await fetch('/api/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ code }),
-      });
-      const j = await r.json();
-      if (!r.ok) return showToast(j.error);
-      state.acquiredIds.add(j.item_id);
-      renderApp();
-      showToast('コードを引き換えました');
+      if (!requireLogin()) return;
+      try {
+        const j = await api('/api/redeem', { method: 'POST', body: { code } });
+        state.acquiredIds.add(j.item_id);
+        renderApp();
+        showToast('コードを引き換えました');
+      } catch (e) { showToast(e.message); }
     }
 
     let toastTimer = null;

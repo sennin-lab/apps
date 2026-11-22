@@ -26,12 +26,55 @@
   const p = new URLSearchParams(location.search);
   const url = p.get('url');
   const title = p.get('title') || '';
+  const frame = document.getElementById('app');
   if (url && /^https?:\/\//.test(url)) {
-    document.getElementById('app').src = url;
+    frame.src = url;
     document.getElementById('fallback').href = url;
   }
   document.getElementById('title').textContent = title;
   document.title = title;
+
+  // ===== アプリ内課金ブリッジ（仙人ポイント） =====
+  // iframe内のアプリは次のように依頼できる:
+  //   parent.postMessage({ type: 'sennin:iap', action: 'purchase', sku: 'pro_unlock', requestId: '1' }, '*');
+  //   parent.postMessage({ type: 'sennin:iap', action: 'owned', requestId: '2' }, '*');
+  // 結果は 'sennin:iap:result'（requestId 付き）で返る。購入は利用者の確認後にのみ実行される。
+  async function api(path, body) {
+    const r = await fetch(path, {
+      method: body ? 'POST' : 'GET',
+      credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
+    return j;
+  }
+  const reply = (requestId, payload) =>
+    frame.contentWindow && frame.contentWindow.postMessage({ type: 'sennin:iap:result', requestId, ...payload }, '*');
+
+  window.addEventListener('message', async (e) => {
+    if (e.source !== frame.contentWindow) return;
+    const m = e.data;
+    if (!m || m.type !== 'sennin:iap') return;
+    const { requestId, action, sku } = m;
+    try {
+      if (action === 'owned') {
+        const r = await api('/api/iap/owned');
+        return reply(requestId, { ok: true, skus: r.skus });
+      }
+      if (action === 'purchase') {
+        const q = await api(`/api/iap/products/${encodeURIComponent(sku)}`);
+        const ok = confirm(`「${q.item_title}」の「${q.name}」を ${Number(q.price_points).toLocaleString()} pt で購入しますか？\n仙人ポイントから引き落とされます。`);
+        if (!ok) return reply(requestId, { ok: false, error: 'キャンセルされました' });
+        const r = await api('/api/iap/purchase', { sku });
+        return reply(requestId, { ok: true, sku, points: r.points ?? null, already: !!r.already });
+      }
+      reply(requestId, { ok: false, error: '不明な操作です' });
+    } catch (err) {
+      reply(requestId, { ok: false, error: err.message, status: err.status ?? null });
+    }
+  });
 </script>
 </body>
 </html>
