@@ -681,7 +681,8 @@
       body: JSON.stringify({ amount: req.amount, title: req.title, requestId: req.requestId }),
     });
     req.inFlight = false;
-    if (r.ok) {
+    const confirmed = r.ok && r.body.ok === true && Number(r.body.charged) === Number(req.amount);
+    if (confirmed) {
       // 支払い完了アニメーションを表示してから閉じる
       req.completing = true;
       $('#payDoneAmt').textContent = `${Number(req.amount).toLocaleString('ja-JP')} pt 支払いました`;
@@ -692,7 +693,7 @@
       }, 1250);
       return;
     }
-    if (r.status === 0 || r.status === 503) {
+    if (r.ok || r.status === 0 || r.status === 503) {
       $('#payErr').textContent = r.body.error || '通信に失敗しました。もう一度「支払う」を押してください。';
       $('#payOk').disabled = false;
       $('#payCancel').disabled = false;

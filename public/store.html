@@ -569,14 +569,6 @@
             </div>
           </div>
 
-          <div class="bg-appleCard rounded-[28px] p-6 sm:p-8 shadow-apple-card border border-black/[0.03]">
-            <h2 class="text-base font-semibold mb-3">コードを引き換える</h2>
-            <div class="flex gap-2">
-              <input id="redeem-input" type="text" placeholder="引き換えコード" class="flex-1 px-4 py-2.5 rounded-xl bg-appleBg text-sm uppercase placeholder-appleSecondary border border-black/5 focus:outline-none focus:ring-2 focus:ring-appleBlue/40" />
-              <button id="redeem-btn" class="px-5 py-2 rounded-full bg-appleBlue text-white text-sm font-semibold hover:bg-appleBlueHover active:scale-95 transition">引き換え</button>
-            </div>
-          </div>
-
           ${related.length ? `
             <div class="pt-2">
               <h3 class="text-lg font-semibold mb-4">関連するアイテム</h3>
@@ -641,10 +633,6 @@
         state.selectedRatingInput = 5;
         showToast(title || body ? 'レビューと評価を送信しました' : `★${rating} の評価を送信しました`);
         renderDetailPage(fresh);
-      });
-
-      document.getElementById('redeem-btn').addEventListener('click', () => {
-        redeemCode(document.getElementById('redeem-input').value.trim());
       });
 
       document.querySelectorAll('.related-card-trigger').forEach(card => {
@@ -715,6 +703,7 @@
       btnElement.innerHTML = `<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin-fast"></span>`;
       try {
         const r = await api('/api/purchase', { method: 'POST', body: { item_id: itemId } });
+        if (r.ok !== true) throw new Error(r.error || '購入できませんでした');
         state.acquiredIds.add(itemId);
         if (ME && r.points != null) ME.points = r.points;
         renderAccountBox();
@@ -725,17 +714,6 @@
         btnElement.innerHTML = original;
         showToast(e.message);
       }
-    }
-
-    async function redeemCode(code) {
-      if (!code) return showToast('コードを入力してください');
-      if (!requireLogin()) return;
-      try {
-        const j = await api('/api/redeem', { method: 'POST', body: { code } });
-        state.acquiredIds.add(j.item_id);
-        renderApp();
-        showToast('コードを引き換えました');
-      } catch (e) { showToast(e.message); }
     }
 
     let toastTimer = null;

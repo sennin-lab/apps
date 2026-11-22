@@ -718,20 +718,6 @@ app.post('/api/apps/:id/award', user(), async (req, res) => {
   res.json({ ok: true, awarded: points, replayed: r.replayed, points: r.points });
 });
 
-// ===== 引き換えコード =====
-app.post('/api/redeem', user(), async (req, res) => {
-  const code = String((req.body || {}).code || '').trim().toUpperCase();
-  const { data: c } = await sb.from('codes').select('*').eq('code', code).maybeSingle();
-  if (!c) return res.status(404).json({ error: '無効なコードです' });
-  if (c.expires_at && new Date(c.expires_at) < new Date()) return res.status(410).json({ error: '期限切れのコードです' });
-  if (c.used_count >= c.max_uses) return res.status(410).json({ error: '使用上限に達しています' });
-  const { data: upd } = await sb.from('codes').update({ used_count: c.used_count + 1 })
-    .eq('code', code).eq('used_count', c.used_count).select();
-  if (!upd?.length) return res.status(409).json({ error: '混雑しています。もう一度お試しください' });
-  await grantLibrary(req.account.sub, c.item_id);
-  res.json({ item_id: c.item_id });
-});
-
 // ===== 画像 =====
 app.get('/img/:id', async (req, res) => {
   const r = await turso.execute({ sql: 'SELECT mime, data FROM images WHERE id = ?', args: [req.params.id] });
